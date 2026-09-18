@@ -1156,3 +1156,124 @@ body.resizing-assistant {
   padding: 6px 9px;
   font-size: 11px;
 }
+
+
+/* Governed Knowledge learning */
+.knowledge-main {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.knowledge-new-profile,
+.knowledge-edit-panel {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.knowledge-new-profile summary,
+.knowledge-edit-panel summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--accent);
+}
+.knowledge-proposal-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.knowledge-proposal-form label {
+  display: grid;
+  gap: 5px;
+  font-weight: 700;
+}
+.knowledge-proposal-form textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.45;
+  resize: vertical;
+}
+.knowledge-proposal-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+}
+.knowledge-proposal-actions span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.knowledge-proposal-list {
+  display: grid;
+  gap: 12px;
+}
+.knowledge-proposal-card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line-strong);
+  border-radius: 9px;
+  overflow: hidden;
+  background: #fff;
+}
+.knowledge-proposal-card.status-pending {
+  border-left-color: #d49a1f;
+}
+.knowledge-proposal-card.status-applied {
+  border-left-color: var(--success);
+}
+.knowledge-proposal-card.status-rejected {
+  border-left-color: #8b96a3;
+}
+.knowledge-proposal-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  background: #fafbfd;
+  border-bottom: 1px solid var(--line);
+}
+.knowledge-proposal-heading > div {
+  display: grid;
+  gap: 3px;
+}
+.knowledge-proposal-heading span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.knowledge-proposal-reason {
+  margin: 12px 14px 0;
+  color: var(--text);
+}
+.knowledge-proposal-card details {
+  padding: 10px 14px;
+}
+.knowledge-proposal-card details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.knowledge-diff {
+  margin: 10px 0 0;
+  padding: 12px;
+  border-radius: 7px;
+  background: #151b23;
+  color: #d9e2ec;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow: auto;
+  max-height: 420px;
+}
+.knowledge-proposal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 0 14px 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.knowledge-proposal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  background: #fafbfd;
+}
