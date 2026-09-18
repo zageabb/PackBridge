@@ -111,6 +111,16 @@
     </div>
     {% endif %}
 
+    {% if learning_recommended %}
+    <div class="learning-banner">
+      <div>
+        <strong>New or unrecognised document layout</strong>
+        <span>PackBridge processed this document with the generic mapper because no approved vendor/document profile matched it.</span>
+      </div>
+      <a class="btn btn-secondary" href="{{ url_for('knowledge.index', job=job.id) }}">Open Learning</a>
+    </div>
+    {% endif %}
+
     <section class="processing-progress" id="processing-progress" hidden>
       <div class="processing-progress-header">
         <div>
