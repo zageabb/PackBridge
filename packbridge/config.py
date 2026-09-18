@@ -15,7 +15,7 @@ class Config:
     DEBUG = os.getenv("PACKBRIDGE_DEBUG", "0").strip().lower() in {"1", "true", "yes", "on"}
 
     PACKBRIDGE_HOST = os.getenv("PACKBRIDGE_HOST", "0.0.0.0")
-    PACKBRIDGE_PORT = int(os.getenv("PACKBRIDGE_PORT", "5078"))
+    PACKBRIDGE_PORT = int(os.getenv("PACKBRIDGE_PORT", "5085"))
 
     DATA_ROOT = Path(os.getenv("PACKBRIDGE_DATA_ROOT", BASE_DIR / "data")).resolve()
     KNOWLEDGE_ROOT = Path(os.getenv("PACKBRIDGE_KNOWLEDGE_ROOT", BASE_DIR / "knowledge")).resolve()
