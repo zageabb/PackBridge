@@ -56,7 +56,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Enforce null for absent values.
 - [x] Capture source evidence.
 - [x] Support package continuation across pages.
-- [ ] Add staged/chunked processing for large documents.
+- [x] Add staged/chunked processing for large documents.
 - [x] Preserve manual edits on safe reprocessing or explicitly warn before overwrite.
 
 ## Phase 4 — Knowledge loader and profiles
@@ -64,7 +64,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Load `knowledge/system/*.md`.
 - [x] Load vendor/document-profile Markdown.
 - [x] Add profile matching using deterministic document indicators.
-- [ ] Add document-profile/version metadata.
+- [x] Add document-profile/version metadata.
 - [ ] Parse/validate structured YAML/JSON rule blocks.
 - [x] Select only relevant knowledge for each prompt.
 - [ ] Support approved few-shot examples.
@@ -150,7 +150,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 - [x] Add job audit timeline.
 - [x] Record model/version used.
-- [ ] Record knowledge/profile version.
+- [x] Record knowledge/profile version.
 - [x] Record template version.
 - [x] Record every user/assistant-approved change.
 - [ ] Add user authentication if required for production deployment.
