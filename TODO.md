@@ -121,10 +121,10 @@ This is the working implementation backlog. Keep it updated as features are comp
 ## Phase 8 — Learning
 
 - [x] Detect unrecognised/new document layouts.
-- [ ] Let user resolve unknown mappings.
+- [x] Let user resolve unknown mappings. *(ambiguous mappings are surfaced as warnings and resolved through working-data edits)*
 - [x] Propose additions to vendor/document Knowledge.
 - [x] Default correction scope to current document only.
-- [ ] Allow explicit "apply to profile" approval.
+- [x] Allow explicit "apply to profile" approval. *(corrected fields can create a profile-learning proposal; Knowledge approval is separate)*
 - [x] Version Knowledge profile changes.
 - [x] Keep knowledge change audit history.
 - [ ] Generate profile/examples from an approved new-document learning session.
