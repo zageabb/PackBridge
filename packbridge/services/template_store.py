@@ -10,6 +10,7 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from .ssd_template import inspect_template
+from .template_cleaner import create_clean_generation_template
 
 
 ALLOWED_TEMPLATE_EXTENSIONS = {".xlsm", ".xlsx"}
@@ -127,4 +128,56 @@ def install_template(root: str | Path, upload: FileStorage) -> dict:
         }
     except Exception:
         temporary.unlink(missing_ok=True)
+        raise
+
+
+
+def clean_active_template(root: str | Path) -> dict:
+    root = Path(root)
+    active = active_template(root)
+    if not active or not active.get("available"):
+        raise TemplateInstallError("No active SSD template is available to clean.")
+
+    inspection = active.get("inspection") or {}
+    if not inspection.get("compatible"):
+        raise TemplateInstallError("The active SSD template is not structurally compatible.")
+    if inspection.get("generation_ready"):
+        return active
+
+    source = Path(active["path"])
+    suffix = source.suffix.casefold()
+    working = root / f".cleaning-{source.stem}{suffix}"
+    working.unlink(missing_ok=True)
+
+    try:
+        result = create_clean_generation_template(source, working)
+        cleaned = result["cleaned"]
+        sha = cleaned["sha256"]
+        versioned_name = f"ssd-template-clean-{sha[:12]}{suffix}"
+        destination = root / versioned_name
+        if destination.exists():
+            working.unlink(missing_ok=True)
+        else:
+            os.replace(working, destination)
+
+        metadata = {
+            "filename": versioned_name,
+            "original_name": active.get("original_name") or source.name,
+            "sha256": sha,
+            "structural_fingerprint": cleaned["structural_fingerprint"],
+            "workbook_type": cleaned["workbook_type"],
+            "has_vba": cleaned["has_vba"],
+            "installed_at": datetime.now(timezone.utc).isoformat(),
+            "cleaned": True,
+            "cleaned_from_sha256": active.get("sha256"),
+        }
+        _write_metadata(root, metadata)
+        return {
+            **metadata,
+            "available": True,
+            "path": str(destination),
+            "inspection": inspect_template(destination).to_dict(),
+        }
+    except Exception:
+        working.unlink(missing_ok=True)
         raise
