@@ -103,3 +103,54 @@ class SSDContextRecord(db.Model):
     )
 
     job = db.relationship("Job", backref=db.backref("ssd_context_record", uselist=False))
+
+
+class SSDProject(db.Model):
+    __tablename__ = "ssd_projects"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    reference = db.Column(db.String(120), index=True)
+    description = db.Column(db.Text)
+    context_json = db.Column(db.Text, nullable=False, default="{}")
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+    )
+
+    job_links = db.relationship(
+        "SSDProjectJob",
+        backref="project",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="SSDProjectJob.ordinal, SSDProjectJob.id",
+    )
+
+
+class SSDProjectJob(db.Model):
+    __tablename__ = "ssd_project_jobs"
+    __table_args__ = (
+        db.UniqueConstraint("project_id", "job_id", name="uq_ssd_project_job"),
+        db.UniqueConstraint("job_id", name="uq_ssd_job_single_project"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(
+        db.Integer,
+        db.ForeignKey("ssd_projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    job_id = db.Column(
+        db.Integer,
+        db.ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    ordinal = db.Column(db.Integer, nullable=False, default=0)
+    added_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+    job = db.relationship("Job", backref=db.backref("ssd_project_link", uselist=False))
