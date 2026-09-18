@@ -25,6 +25,7 @@ class Config:
     OLLAMA_MODEL = os.getenv("PACKBRIDGE_OLLAMA_MODEL", "qwen3:14b")
 
     MAX_CONTENT_LENGTH = int(os.getenv("PACKBRIDGE_MAX_UPLOAD_MB", "100")) * 1024 * 1024
+    AUTO_CREATE_DB = os.getenv("PACKBRIDGE_AUTO_CREATE_DB", "1").strip().lower() in {"1", "true", "yes", "on"}
     SQLALCHEMY_DATABASE_URI = os.getenv(
         "PACKBRIDGE_DATABASE_URL",
         f"sqlite:///{(BASE_DIR / 'instance' / 'packbridge.sqlite3').resolve()}",
