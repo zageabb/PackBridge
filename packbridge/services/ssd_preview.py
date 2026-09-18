@@ -174,7 +174,7 @@ def build_ssd_preview(packing: PackingList, context: SSDContext | None = None) -
         text = f"{issue.code}: {issue.message}"
         if issue.severity == "BLOCKING":
             preview.blocking.append(text)
-        elif issue.severity == "WARNING":
+        elif issue.severity == "WARNING" and not issue.resolved:
             preview.warnings.append(text)
 
     canonical_purchase_order = _text(packing.order.purchase_order)
