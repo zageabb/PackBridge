@@ -5,6 +5,22 @@ from numbers import Number
 from packbridge.schemas import FieldValue, MappingIssue, PackingList
 
 
+DIMENSION_UNITS = {"MM", "CM", "M", "METRE", "METER", "IN", "INCH", "INCHES"}
+WEIGHT_UNITS = {"G", "GRAM", "GRAMS", "KG", "LB", "LBS", "POUND", "POUNDS"}
+
+
+def _normalise_unit(value: str | None) -> str:
+    return str(value or "").strip().upper().replace(".", "")
+
+
+def _field_unit(field: FieldValue, fallback: str | None = None) -> str:
+    if field.working is not None and field.working.unit not in (None, ""):
+        return _normalise_unit(field.working.unit)
+    if field.source is not None and field.source.unit not in (None, ""):
+        return _normalise_unit(field.source.unit)
+    return _normalise_unit(fallback)
+
+
 def _value(field: FieldValue):
     if field.working is not None:
         return field.working.value
@@ -102,6 +118,27 @@ def validate_packing_list(packing: PackingList) -> PackingList:
                 )
             )
 
+        elif not _field_unit(package.gross_weight):
+            issues.append(
+                MappingIssue(
+                    code="GROSS_WEIGHT_UNIT_MISSING",
+                    severity="WARNING",
+                    message="Gross weight has no source/working unit.",
+                    case_number=case_number,
+                    field_path=f"packages[{package_index - 1}].gross_weight",
+                )
+            )
+        elif _field_unit(package.gross_weight) not in WEIGHT_UNITS:
+            issues.append(
+                MappingIssue(
+                    code="GROSS_WEIGHT_UNIT_UNKNOWN",
+                    severity="WARNING",
+                    message=f"Gross weight unit {_field_unit(package.gross_weight)!r} is not recognised.",
+                    case_number=case_number,
+                    field_path=f"packages[{package_index - 1}].gross_weight",
+                )
+            )
+
         if _value(package.net_weight) in (None, ""):
             issues.append(
                 MappingIssue(
@@ -118,6 +155,27 @@ def validate_packing_list(packing: PackingList) -> PackingList:
                     code="NET_WEIGHT_INVALID",
                     severity="BLOCKING",
                     message="Net weight is not numeric.",
+                    case_number=case_number,
+                    field_path=f"packages[{package_index - 1}].net_weight",
+                )
+            )
+
+        elif not _field_unit(package.net_weight):
+            issues.append(
+                MappingIssue(
+                    code="NET_WEIGHT_UNIT_MISSING",
+                    severity="WARNING",
+                    message="Net weight has no source/working unit.",
+                    case_number=case_number,
+                    field_path=f"packages[{package_index - 1}].net_weight",
+                )
+            )
+        elif _field_unit(package.net_weight) not in WEIGHT_UNITS:
+            issues.append(
+                MappingIssue(
+                    code="NET_WEIGHT_UNIT_UNKNOWN",
+                    severity="WARNING",
+                    message=f"Net weight unit {_field_unit(package.net_weight)!r} is not recognised.",
                     case_number=case_number,
                     field_path=f"packages[{package_index - 1}].net_weight",
                 )
@@ -155,6 +213,7 @@ def validate_packing_list(packing: PackingList) -> PackingList:
             if raw_value in (None, ""):
                 continue
             number = _number(dimension_field)
+            field_path = f"packages[{package_index - 1}].dimensions.{name}"
             if number is None or number < 0:
                 issues.append(
                     MappingIssue(
@@ -162,7 +221,30 @@ def validate_packing_list(packing: PackingList) -> PackingList:
                         severity="BLOCKING",
                         message=f"{name.title()} must be a non-negative number.",
                         case_number=case_number,
-                        field_path=f"packages[{package_index - 1}].dimensions.{name}",
+                        field_path=field_path,
+                    )
+                )
+                continue
+
+            unit = _field_unit(dimension_field, package.dimensions.unit)
+            if not unit:
+                issues.append(
+                    MappingIssue(
+                        code="DIMENSION_UNIT_MISSING",
+                        severity="WARNING",
+                        message=f"{name.title()} has no source/working dimension unit.",
+                        case_number=case_number,
+                        field_path=field_path,
+                    )
+                )
+            elif unit not in DIMENSION_UNITS:
+                issues.append(
+                    MappingIssue(
+                        code="DIMENSION_UNIT_UNKNOWN",
+                        severity="WARNING",
+                        message=f"{name.title()} unit {unit!r} is not recognised.",
+                        case_number=case_number,
+                        field_path=field_path,
                     )
                 )
 
