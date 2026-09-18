@@ -1,4 +1,4 @@
-from packbridge.services.ollama_client import OllamaClient
+from pydantic import BaseModel\n\nfrom packbridge.services.ollama_client import OllamaClient
 
 
 class FakeResponse:
@@ -43,3 +43,32 @@ def test_list_models_returns_names():
     result = client.list_models()
 
     assert result.value == ["qwen3:14b", "qwen3:8b"]
+
+
+
+class StructuredReply(BaseModel):
+    message: str
+    proposed_changes: list[dict]
+
+
+def test_chat_json_uses_schema_and_parses_message_content():
+    session = FakeSession(
+        {
+            "message": {
+                "content": '{"message":"Done","proposed_changes":[]}'
+            }
+        }
+    )
+    client = OllamaClient("http://localhost:11434", "qwen3:14b", session=session)
+
+    result = client.chat_json(
+        [{"role": "user", "content": "Hello"}],
+        StructuredReply,
+        system_prompt="Return structured output",
+    )
+
+    assert result.available is True
+    assert result.value.message == "Done"
+    assert result.value.proposed_changes == []
+    assert session.last_json["format"]["type"] == "object"
+    assert session.last_json["options"]["temperature"] == 0
