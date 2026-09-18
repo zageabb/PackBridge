@@ -958,3 +958,98 @@ body.resizing-assistant {
   color: var(--muted);
   font-size: 12px;
 }
+
+
+/* Assistant review-first change proposals */
+.chat-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-width: 96%;
+}
+.chat-entry.user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.chat-entry.assistant,
+.chat-entry.system {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+.chat-entry .chat-message {
+  max-width: 100%;
+}
+.assistant-proposal {
+  width: 100%;
+  min-width: min(320px, 85vw);
+  border: 1px solid #c7d8eb;
+  border-radius: 9px;
+  background: #f8fbff;
+  overflow: hidden;
+}
+.assistant-proposal-heading {
+  padding: 9px 10px;
+  border-bottom: 1px solid #d8e4f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 9px;
+}
+.assistant-proposal-heading strong {
+  font-size: 12px;
+}
+.assistant-proposal-status {
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  background: #edf1f5;
+  color: var(--muted);
+}
+.assistant-proposal-status.status-pending {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.assistant-proposal-status.status-applied {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.assistant-proposal-status.status-rejected {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.assistant-proposal-list {
+  display: grid;
+}
+.assistant-proposal-change {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border-bottom: 1px solid #e6edf4;
+}
+.assistant-proposal-change:last-child {
+  border-bottom: 0;
+}
+.assistant-proposal-change code {
+  font-size: 10px;
+  color: var(--accent-2);
+  overflow-wrap: anywhere;
+}
+.assistant-proposal-values {
+  font-weight: 800;
+  font-size: 12px;
+}
+.assistant-proposal-change small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+.assistant-proposal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 9px 10px;
+  border-top: 1px solid #d8e4f0;
+  background: #fff;
+}
