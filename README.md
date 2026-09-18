@@ -28,3 +28,29 @@ The first implementation should prove that PackBridge can ingest the packing lis
 See the [design documentation](docs/00_PRODUCT_VISION.md), [architecture](docs/01_ARCHITECTURE.md), [UI/UX design](docs/02_UI_UX_DESIGN.md), [roadmap](docs/ROADMAP.md), and the main [TODO](TODO.md).
 
 The `knowledge/` directory is designed to contain the human-readable mapping guidance used by the local mapper.
+
+
+## Local run
+
+PackBridge is assigned **TCP port 5085** for the local Ubuntu deployment.
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+cp .env.example .env
+.venv/bin/python app.py
+```
+
+Open:
+
+```text
+http://<server-ip>:5085/
+```
+
+The default local model is `qwen3:14b`; change the Ollama URL/model through Settings or environment configuration.
+
+## Current implementation
+
+The current development build includes document upload/extraction, deterministic document-profile matching, local Ollama structured mapping, an editable provenance-aware Virtual SSD, validation issues, field/case/job revert controls, a resizable job assistant, audit history, and a read-only Knowledge browser.
+
+Final SSD generation remains intentionally disabled until the reference workbook has been inspected and its SAP-sensitive mapping has been verified.
