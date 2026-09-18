@@ -23,6 +23,7 @@ from packbridge.services.document_ingestion import (
 )
 from packbridge.services.mapper import MappingError, map_packing_list
 from packbridge.services.prompt_service import load_prompt
+from packbridge.services.profile_matching import match_profile
 from packbridge.services.runtime_settings import client as ollama_client
 from packbridge.services.storage import save_job_upload
 from packbridge.services.working_data import (
@@ -215,6 +216,27 @@ def process(job_id: int):
 
     document_text = "\n\n".join(f"[{chunk.locator}]\n{chunk.text}" for chunk in chunks)
     profile_hint = request.form.get("profile_hint", "").strip()
+    profile_match = None
+    if not profile_hint:
+        profile_match = match_profile(Path(current_app.config["KNOWLEDGE_ROOT"]), document_text)
+        if profile_match:
+            profile_hint = (
+                f"Matched document profile: {profile_match.title}. "
+                f"Knowledge path: {profile_match.path}. "
+                f"Matched indicators: {', '.join(profile_match.matched_indicators)}"
+            )
+            job.document_profile = profile_match.title
+            _audit(
+                job.id,
+                "profile_matched",
+                f"Matched document profile {profile_match.title}",
+                {
+                    "path": profile_match.path,
+                    "score": profile_match.score,
+                    "total_indicators": profile_match.total_indicators,
+                    "matched_indicators": profile_match.matched_indicators,
+                },
+            )
 
     job.status = "processing"
     _audit(
@@ -231,7 +253,7 @@ def process(job_id: int):
         job.source_json = payload
         job.working_json = payload
         job.vendor = packing.document.vendor
-        job.document_profile = packing.document.document_profile
+        job.document_profile = packing.document.document_profile or (profile_match.title if profile_match else job.document_profile)
         sales_order = packing.order.sales_order.working.value if packing.order.sales_order.working else None
         job.sales_order = str(sales_order) if sales_order not in (None, "") else None
         job.status = "mapped"
