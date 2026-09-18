@@ -22,7 +22,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 - [x] Create Flask application skeleton.
 - [x] Add configuration management and `.env.example`.
-- [ ] Add SQLite database initialisation/migrations.
+- [x] Add SQLite database initialisation/migrations.
 - [x] Create job/workspace model.
 - [x] Create file-storage layout for source, working artefacts and outputs.
 - [x] Add basic top navigation: Jobs / Knowledge / Settings.
