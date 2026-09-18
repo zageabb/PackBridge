@@ -185,3 +185,36 @@ class SSDOutputRecord(db.Model):
             order_by="SSDOutputRecord.created_at.desc()",
         ),
     )
+
+
+class AssistantProposalRecord(db.Model):
+    __tablename__ = "assistant_proposals"
+
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(
+        db.Integer,
+        db.ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    assistant_message_id = db.Column(
+        db.Integer,
+        db.ForeignKey("chat_messages.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    status = db.Column(db.String(20), nullable=False, default="pending", index=True)
+    changes_json = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    decided_at = db.Column(db.DateTime(timezone=True))
+    decided_by = db.Column(db.String(120))
+
+    job = db.relationship(
+        "Job",
+        backref=db.backref("assistant_proposals", cascade="all, delete-orphan"),
+    )
+    assistant_message = db.relationship(
+        "ChatMessage",
+        backref=db.backref("proposal", uselist=False, cascade="all, delete-orphan"),
+    )
