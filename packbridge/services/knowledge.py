@@ -66,3 +66,18 @@ def context_for(root: Path, query: str, limit: int = 6, max_chars: int = 30_000)
         if remaining <= 0:
             break
     return "\n\n".join(sections)
+
+
+
+def find_by_title(root: Path, title: str) -> Path | None:
+    wanted = str(title or "").strip().casefold()
+    if not wanted:
+        return None
+    for path in list_documents(root):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if _title(text, path.stem).casefold() == wanted:
+            return path
+    return None
