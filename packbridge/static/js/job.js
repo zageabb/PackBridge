@@ -12,6 +12,8 @@
   const editorReason = document.getElementById("field-editor-reason");
   const editorSource = document.getElementById("field-editor-source");
   const editorLocator = document.getElementById("field-editor-locator");
+  const editorRaw = document.getElementById("field-editor-raw");
+  const sourceJump = document.getElementById("field-editor-source-jump");
   const editorError = document.getElementById("field-editor-error");
   const revertButton = document.getElementById("field-editor-revert");
   const resizeHandle = document.getElementById("assistant-resize-handle");
@@ -65,7 +67,13 @@
     const source = button.dataset.source || "";
     const sourceUnit = button.dataset.sourceUnit || "";
     editorSource.textContent = source ? source + (sourceUnit ? " " + sourceUnit : "") : "—";
-    editorLocator.textContent = button.dataset.locator ? "Source: " + button.dataset.locator : "No source locator recorded";
+    const locator = button.dataset.locator || "";
+    const raw = button.dataset.raw || "";
+    editorLocator.textContent = locator ? "Source: " + locator : "No source locator recorded";
+    editorRaw.textContent = raw;
+    editorRaw.hidden = !raw;
+    sourceJump.hidden = !locator;
+    sourceJump.dataset.locator = locator;
     if (typeof editor.showModal === "function") {
       editor.showModal();
       editorValue.focus();
@@ -79,6 +87,21 @@
 
   document.querySelectorAll("[data-close-editor]").forEach((button) => {
     button.addEventListener("click", () => editor.close());
+  });
+
+  sourceJump?.addEventListener("click", () => {
+    const locator = sourceJump.dataset.locator || "";
+    if (!locator) return;
+    const target = Array.from(document.querySelectorAll("[data-source-locator]"))
+      .find((node) => node.dataset.sourceLocator === locator);
+    editor.close();
+    if (target) {
+      target.scrollIntoView({behavior: "smooth", block: "center"});
+      target.classList.add("source-highlight");
+      window.setTimeout(() => target.classList.remove("source-highlight"), 2200);
+    } else {
+      window.location.hash = "source";
+    }
   });
 
   async function postJson(url, payload) {
