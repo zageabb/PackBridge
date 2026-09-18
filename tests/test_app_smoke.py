@@ -90,3 +90,65 @@ def test_mapped_job_can_be_attached_to_project(tmp_path):
     assert response.status_code == 200
     assert b"Mapped Job" in response.data
     assert b"CASE-1" in response.data
+
+
+
+def test_case_specific_ssd_override_round_trip(tmp_path):
+    TestConfig = type(
+        "TestConfig",
+        (Config,),
+        {
+            "TESTING": True,
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///" + str(tmp_path / "test.sqlite3"),
+            "DATA_ROOT": tmp_path / "data",
+            "KNOWLEDGE_ROOT": tmp_path / "knowledge",
+            "TEMPLATE_ROOT": tmp_path / "templates",
+        },
+    )
+    app = create_app(TestConfig)
+
+    from packbridge.schemas import FieldValue, Package, PackingList, SourceValue, WorkingValue
+
+    def field(value):
+        return FieldValue(
+            source=SourceValue(value=value),
+            working=WorkingValue(value=value, origin="source"),
+        )
+
+    with app.app_context():
+        packing = PackingList(
+            packages=[
+                Package(
+                    case_number=field("CASE-OVERRIDE"),
+                    gross_weight=field(10),
+                    net_weight=field(9),
+                )
+            ]
+        )
+        job = Job(title="Override Job", status="mapped", working_json=packing.model_dump_json())
+        db.session.add(job)
+        db.session.commit()
+        job_id = job.id
+
+    client = app.test_client()
+    response = client.post(
+        f"/jobs/{job_id}/ssd-context/case",
+        data={
+            "case_number": "CASE-OVERRIDE",
+            "case_packaging_material": "WOODEN_BOX",
+            "case_stackability": "Not stackable",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"override active" in response.data
+    assert b"WOODEN_BOX" in response.data
+
+    reset = client.post(
+        f"/jobs/{job_id}/ssd-context/case/reset",
+        data={"case_number": "CASE-OVERRIDE"},
+        follow_redirects=True,
+    )
+    assert reset.status_code == 200
+    assert b"override active" not in reset.data
