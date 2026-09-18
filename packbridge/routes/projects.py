@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from datetime import datetime, timezone
+from pathlib import Path
+
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_file, url_for
 from sqlalchemy import select
 
 from packbridge.extensions import db
-from packbridge.models import Job, SSDProject, SSDProjectJob
+from packbridge.models import Job, SSDOutputRecord, SSDProject, SSDProjectJob
 from packbridge.ssd_schemas import SSDCaseContext, SSDContext, SSDHeaderContext
 from packbridge.services.aggregation import AggregationInput, build_project_preview
 from packbridge.services.working_data import load_packing
+from packbridge.services.ssd_writer import SSDWriterError, write_socs_preview
+from packbridge.services.template_store import active_template
 
 bp = Blueprint("projects", __name__, url_prefix="/projects")
 
@@ -75,6 +80,16 @@ def view(project_id: int):
     context = _context(project)
     inputs = _mapped_inputs(project)
     preview = build_project_preview(inputs, context)
+    template = active_template(current_app.config["TEMPLATE_ROOT"])
+    generation_ready = bool(
+        preview.rows
+        and not preview.blocking
+        and not preview.warnings
+        and template
+        and template.get("available")
+        and (template.get("inspection") or {}).get("generation_ready")
+        and (template.get("inspection") or {}).get("has_vba")
+    )
 
     attached_job_ids = {link.job_id for link in project.job_links}
     linked_elsewhere = {
@@ -101,6 +116,8 @@ def view(project_id: int):
         preview=preview,
         available_jobs=available_jobs,
         total_packages=len(preview.rows),
+        template=template,
+        generation_ready=generation_ready,
     )
 
 
@@ -199,3 +216,102 @@ def update_context(project_id: int):
     db.session.commit()
     flash("SSD project context saved.", "success")
     return redirect(url_for("projects.view", project_id=project.id) + "#project-preview")
+
+
+
+@bp.post("/<int:project_id>/build-validation")
+def build_validation_workbook(project_id: int):
+    project = SSDProject.query.get_or_404(project_id)
+    context = _context(project)
+    preview = build_project_preview(_mapped_inputs(project), context)
+    template = active_template(current_app.config["TEMPLATE_ROOT"])
+
+    if not preview.rows:
+        flash("Attach at least one mapped packing-list job before building a workbook.", "danger")
+        return redirect(url_for("projects.view", project_id=project.id) + "#outputs")
+    if preview.blocking:
+        flash("Resolve blocking SSD preview issues before building a workbook.", "danger")
+        return redirect(url_for("projects.view", project_id=project.id) + "#project-preview")
+    if preview.warnings:
+        flash("Resolve SSD preview warnings/missing context before building a validation workbook.", "warning")
+        return redirect(url_for("projects.view", project_id=project.id) + "#project-preview")
+    if not template or not template.get("available"):
+        flash("Install a controlled SSD template first.", "danger")
+        return redirect(url_for("settings.index"))
+    inspection = template.get("inspection") or {}
+    if not inspection.get("generation_ready"):
+        flash("The active SSD template is not a clean generation template.", "danger")
+        return redirect(url_for("settings.index"))
+    if not inspection.get("has_vba"):
+        flash("The first controlled validation writer requires the macro-enabled template.", "danger")
+        return redirect(url_for("settings.index"))
+
+    output_root = (
+        Path(current_app.config["DATA_ROOT"])
+        / "ssd-projects"
+        / str(project.id)
+        / "output"
+    )
+    output_root.mkdir(parents=True, exist_ok=True)
+    safe_reference = "".join(
+        character if character.isalnum() or character in "-_" else "-"
+        for character in (project.reference or project.name)
+    ).strip("-_") or f"project-{project.id}"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    suffix = Path(template["path"]).suffix.casefold() or ".xlsm"
+    filename = f"PackBridge-{safe_reference}-VALIDATION-{timestamp}{suffix}"
+    destination = output_root / filename
+
+    try:
+        result = write_socs_preview(
+            template["path"],
+            destination,
+            preview,
+            require_vba=True,
+        )
+    except (SSDWriterError, OSError, ValueError) as exc:
+        flash(f"SSD validation workbook was not created: {exc}", "danger")
+        return redirect(url_for("projects.view", project_id=project.id) + "#outputs")
+
+    record = SSDOutputRecord(
+        project_id=project.id,
+        output_type="validation",
+        filename=filename,
+        path=str(destination),
+        sha256=result["sha256"],
+        template_sha256=str(template.get("sha256") or ""),
+        structural_fingerprint=result["structural_fingerprint"],
+        rows_written=result["rows_written"],
+        cells_written=result["cells_written"],
+        status="verified",
+    )
+    db.session.add(record)
+    db.session.commit()
+    flash(
+        "Validation SSD workbook created and re-verified. It is not yet SAP-approved.",
+        "success",
+    )
+    return redirect(url_for("projects.view", project_id=project.id) + "#outputs")
+
+
+@bp.get("/<int:project_id>/outputs/<int:output_id>/download")
+def download_output(project_id: int, output_id: int):
+    project = SSDProject.query.get_or_404(project_id)
+    record = SSDOutputRecord.query.filter_by(
+        id=output_id,
+        project_id=project.id,
+    ).first_or_404()
+
+    path = Path(record.path).resolve()
+    data_root = Path(current_app.config["DATA_ROOT"]).resolve()
+    if data_root != path and data_root not in path.parents:
+        abort(403)
+    if not path.is_file():
+        abort(404)
+
+    return send_file(
+        path,
+        as_attachment=True,
+        download_name=record.filename,
+        mimetype="application/vnd.ms-excel.sheet.macroEnabled.12",
+    )
