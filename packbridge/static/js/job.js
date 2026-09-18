@@ -13,6 +13,36 @@
   const editorLocator = document.getElementById("field-editor-locator");
   const editorError = document.getElementById("field-editor-error");
   const revertButton = document.getElementById("field-editor-revert");
+  const resizeHandle = document.getElementById("assistant-resize-handle");
+
+  const savedWidth = Number(window.localStorage.getItem("packbridge-assistant-width"));
+  if (savedWidth >= 300 && savedWidth <= 700 && window.innerWidth > 1050) {
+    shell.style.setProperty("--assistant-width", savedWidth + "px");
+  }
+
+  resizeHandle?.addEventListener("pointerdown", (event) => {
+    if (window.innerWidth <= 1050) return;
+    event.preventDefault();
+    resizeHandle.setPointerCapture(event.pointerId);
+    document.body.classList.add("resizing-assistant");
+
+    const move = (moveEvent) => {
+      const width = Math.min(700, Math.max(300, window.innerWidth - moveEvent.clientX));
+      shell.style.setProperty("--assistant-width", width + "px");
+      window.localStorage.setItem("packbridge-assistant-width", String(width));
+    };
+
+    const finish = () => {
+      document.body.classList.remove("resizing-assistant");
+      resizeHandle.removeEventListener("pointermove", move);
+      resizeHandle.removeEventListener("pointerup", finish);
+      resizeHandle.removeEventListener("pointercancel", finish);
+    };
+
+    resizeHandle.addEventListener("pointermove", move);
+    resizeHandle.addEventListener("pointerup", finish);
+    resizeHandle.addEventListener("pointercancel", finish);
+  });
 
   function showError(message) {
     editorError.textContent = message;
