@@ -12,7 +12,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Document document-driven Knowledge approach.
 - [x] Document editable working data with immutable source evidence.
 - [x] Document deterministic SSD-generation boundary.
-- [ ] Verify the exact SSD workbook structure and create the canonical → SSD mapping specification.
+- [ ] Verify the exact SSD workbook structure and create the canonical → SSD mapping specification. *(workbook reverse engineering and safe direct package mappings complete; remaining project/item mappings pending)*
 - [ ] Confirm whether generated XLSX without macros is accepted by the SAP import process.
 - [x] Decide initial supported source file types for v0.1.
 - [x] Select initial Ollama model for baseline testing.
@@ -74,6 +74,8 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 ## Phase 5 — Virtual SSD
 
+- [x] Add SSD project/default context separate from source evidence.
+
 - [x] Create Summary tab.
 - [x] Create case tabs / searchable case selector.
 - [x] Create editable SSD-style field layout.
@@ -129,9 +131,12 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 ## Phase 9 — SSD generator
 
-- [ ] Inspect and document reference SSD workbook structure.
+- [ ] Add SSD/project aggregation to support assembling multiple packing-list jobs into one workbook.
+- [x] Add structural SSD template inspection and controlled template installation.
+
+- [x] Inspect and document reference SSD workbook structure.
 - [ ] Establish approved clean SSD template.
-- [ ] Implement template version management.
+- [x] Implement template version management.
 - [ ] Implement deterministic canonical → SSD mapping.
 - [ ] Write only permitted values/locations.
 - [ ] Preserve required formatting/formulas/validations/named structures.
@@ -160,7 +165,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 - [ ] Build golden test set from multiple packing-list formats.
 - [ ] Add expected canonical JSON for each test document.
-- [ ] Add continuation-page regression tests.
+- [x] Add continuation-page regression tests.
 - [x] Add source-vs-working edit tests.
 - [x] Add validation tests.
 - [ ] Add SSD structure regression tests.
