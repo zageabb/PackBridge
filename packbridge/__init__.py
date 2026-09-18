@@ -24,11 +24,13 @@ def create_app(config_object: type[Config] = Config) -> Flask:
     from .routes.main import bp as main_bp
     from .routes.jobs import bp as jobs_bp
     from .routes.knowledge import bp as knowledge_bp
+    from .routes.projects import bp as projects_bp
     from .routes.settings import bp as settings_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(jobs_bp)
     app.register_blueprint(knowledge_bp)
+    app.register_blueprint(projects_bp)
     app.register_blueprint(settings_bp)
 
     with app.app_context():
