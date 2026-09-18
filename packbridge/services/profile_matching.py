@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,8 @@ class ProfileMatch:
     score: int
     matched_indicators: tuple[str, ...]
     total_indicators: int
+    sha256: str
+    version: str | None = None
 
 
 def _title(text: str, fallback: str) -> str:
@@ -19,6 +22,15 @@ def _title(text: str, fallback: str) -> str:
         if line.startswith("# "):
             return line[2:].strip()
     return fallback
+
+
+def _profile_version(text: str) -> str | None:
+    for line in text.splitlines():
+        match = re.match(r"^s*Versions*:s*(.+?)s*$", line, flags=re.I)
+        if match:
+            value = match.group(1).strip()
+            return value or None
+    return None
 
 
 def _section_lines(text: str, heading: str) -> list[str]:
@@ -42,7 +54,7 @@ def _section_lines(text: str, heading: str) -> list[str]:
 def _recognition_indicators(text: str) -> list[str]:
     values = []
     for line in _section_lines(text, "Typical recognition indicators"):
-        match = re.match(r"^\s*[-*]\s+(.+?)\s*$", line)
+        match = re.match(r"^s*[-*]s+(.+?)s*$", line)
         if not match:
             continue
         value = match.group(1).strip().strip(chr(96)).strip()
@@ -51,7 +63,7 @@ def _recognition_indicators(text: str) -> list[str]:
     return values
 
 
-def list_profiles(root: Path) -> list[tuple[Path, str, list[str]]]:
+def list_profiles(root: Path) -> list[tuple[Path, str, list[str], str, str | None]]:
     vendor_root = root / "vendors"
     if not vendor_root.exists():
         return []
@@ -64,14 +76,23 @@ def list_profiles(root: Path) -> list[tuple[Path, str, list[str]]]:
         indicators = _recognition_indicators(text)
         if not indicators:
             continue
-        profiles.append((path, _title(text, path.stem), indicators))
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        profiles.append(
+            (
+                path,
+                _title(text, path.stem),
+                indicators,
+                digest,
+                _profile_version(text),
+            )
+        )
     return profiles
 
 
 def match_profile(root: Path, document_text: str, minimum_score: int = 3) -> ProfileMatch | None:
     haystack = " ".join(document_text.casefold().split())
     matches: list[ProfileMatch] = []
-    for path, title, indicators in list_profiles(root):
+    for path, title, indicators, digest, version in list_profiles(root):
         matched = tuple(
             indicator
             for indicator in indicators
@@ -86,6 +107,8 @@ def match_profile(root: Path, document_text: str, minimum_score: int = 3) -> Pro
                 score=len(matched),
                 matched_indicators=matched,
                 total_indicators=len(indicators),
+                sha256=digest,
+                version=version,
             )
         )
     if not matches:
