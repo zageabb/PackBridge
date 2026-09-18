@@ -376,6 +376,82 @@
           </form>
         </details>
 
+        {% if selected_package and selected_package.case_number.working and selected_package.case_number.working.value %}
+        {% set selected_case_value = selected_package.case_number.working.value|string %}
+        <details class="ssd-context-panel case-override-panel" {% if selected_ssd_override %}open{% endif %}>
+          <summary>
+            Case-specific SSD override — {{ selected_case_value }}
+            {% if selected_ssd_override %}<span class="override-badge">override active</span>{% endif %}
+          </summary>
+          <form method="post" action="{{ url_for('jobs.update_ssd_case_context', job_id=job.id) }}" class="ssd-context-form">
+            <input type="hidden" name="case_number" value="{{ selected_case_value }}">
+            <fieldset>
+              <legend>Override only what differs from the defaults</legend>
+              <label><span>Content Description</span><input name="case_content_description" value="{{ selected_ssd_override.content_description if selected_ssd_override and selected_ssd_override.content_description else '' }}" placeholder="{{ ssd_context.defaults.content_description or 'Inherited default' }}"></label>
+              <label><span>EQ Group</span><input name="case_equipment_group" value="{{ selected_ssd_override.equipment_group if selected_ssd_override and selected_ssd_override.equipment_group else '' }}" placeholder="{{ ssd_context.defaults.equipment_group or 'Inherited default' }}"></label>
+              <label><span>HE PO Number</span><input name="case_purchase_order" value="{{ selected_ssd_override.purchase_order if selected_ssd_override and selected_ssd_override.purchase_order else '' }}" placeholder="{{ ssd_context.defaults.purchase_order or 'Inherited/default source PO' }}"></label>
+              <label><span>PO Position</span><input name="case_purchase_order_position" value="{{ selected_ssd_override.purchase_order_position if selected_ssd_override and selected_ssd_override.purchase_order_position else '' }}" placeholder="{{ ssd_context.defaults.purchase_order_position or 'Inherited/default source position' }}"></label>
+              <label><span>Declare As</span>
+                <select name="case_declare_as">
+                  <option value="">Inherit — {{ ssd_context.defaults.declare_as or 'blank' }}</option>
+                  {% for value in ['System', 'Loose Parts'] %}
+                    <option value="{{ value }}" {% if selected_ssd_override and selected_ssd_override.declare_as == value %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label><span>Storage Requirement</span>
+                <select name="case_storage_requirement">
+                  <option value="">Inherit — {{ ssd_context.defaults.storage_requirement or 'blank' }}</option>
+                  {% for value in ['Outdoor', 'Outdoor covered', 'Indoor', 'Indoor heated'] %}
+                    <option value="{{ value }}" {% if selected_ssd_override and selected_ssd_override.storage_requirement == value %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label><span>Packaging Material</span>
+                <select name="case_packaging_material">
+                  <option value="">Inherit — {{ ssd_context.defaults.packaging_material or 'blank' }}</option>
+                  {% for value in ['PALLET','CARTON_BOX','WOODEN_FRAME','BUNDLE','WOODEN_BOX','DRUM','UNPACKED'] %}
+                    <option value="{{ value }}" {% if selected_ssd_override and selected_ssd_override.packaging_material == value %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label><span>Stackability</span>
+                <select name="case_stackability">
+                  <option value="">Inherit — {{ ssd_context.defaults.stackability or 'blank' }}</option>
+                  {% for value in ['Stackable 1 tier','Stackable 2 tier','Stackable 3 tier','Not stackable'] %}
+                    <option value="{{ value }}" {% if selected_ssd_override and selected_ssd_override.stackability == value %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label><span>Dangerous Goods</span>
+                <select name="case_dangerous_goods">
+                  <option value="">Inherit — {{ ssd_context.defaults.dangerous_goods or 'blank' }}</option>
+                  <option value="N" {% if selected_ssd_override and selected_ssd_override.dangerous_goods == 'N' %}selected{% endif %}>N</option>
+                  <option value="Y" {% if selected_ssd_override and selected_ssd_override.dangerous_goods == 'Y' %}selected{% endif %}>Y</option>
+                </select>
+              </label>
+              <label><span>Border Crossing Value</span><input name="case_border_crossing_value" value="{{ selected_ssd_override.border_crossing_value if selected_ssd_override and selected_ssd_override.border_crossing_value is not none else '' }}" placeholder="{{ ssd_context.defaults.border_crossing_value if ssd_context.defaults.border_crossing_value is not none else 'Inherited default' }}"></label>
+              <label><span>Pickup Week Planned</span><input name="case_pickup_week_planned" value="{{ selected_ssd_override.pickup_week_planned if selected_ssd_override and selected_ssd_override.pickup_week_planned else '' }}" placeholder="{{ ssd_context.defaults.pickup_week_planned or 'Inherited default' }}"></label>
+              <label><span>Pickup Week Actual</span><input name="case_pickup_week_actual" value="{{ selected_ssd_override.pickup_week_actual if selected_ssd_override and selected_ssd_override.pickup_week_actual else '' }}" placeholder="{{ ssd_context.defaults.pickup_week_actual or 'Inherited default' }}"></label>
+              <label><span>Item Designation</span><input name="case_item_designation" value="{{ selected_ssd_override.item_designation if selected_ssd_override and selected_ssd_override.item_designation else '' }}" placeholder="{{ ssd_context.defaults.item_designation or 'Inherited default' }}"></label>
+              <label class="wide"><span>Remarks</span><input name="case_remarks" value="{{ selected_ssd_override.remarks if selected_ssd_override and selected_ssd_override.remarks else '' }}" placeholder="{{ ssd_context.defaults.remarks or 'Inherited default' }}"></label>
+            </fieldset>
+            <div class="ssd-context-actions">
+              <span>Blank fields inherit the job defaults. Overrides are stored separately from source evidence.</span>
+              <div class="button-row">
+                <button class="btn btn-primary" type="submit">Save case override</button>
+              </div>
+            </div>
+          </form>
+          {% if selected_ssd_override %}
+          <form method="post" action="{{ url_for('jobs.reset_ssd_case_context', job_id=job.id) }}" class="case-override-reset">
+            <input type="hidden" name="case_number" value="{{ selected_case_value }}">
+            <button class="btn btn-secondary" type="submit">Reset case to defaults</button>
+          </form>
+          {% endif %}
+        </details>
+        {% endif %}
+
         {% if ssd_preview %}
           {% if ssd_preview.blocking or ssd_preview.warnings %}
           <div class="preview-messages">
