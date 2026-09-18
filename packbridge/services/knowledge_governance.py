@@ -12,6 +12,24 @@ class KnowledgeGovernanceError(ValueError):
     pass
 
 
+MAX_KNOWLEDGE_CHARS = 500_000
+
+
+def validate_knowledge_content(value: str) -> str:
+    text = str(value or "")
+    if not text.strip():
+        raise KnowledgeGovernanceError("Knowledge content cannot be blank.")
+    if "\x00" in text:
+        raise KnowledgeGovernanceError("Knowledge content contains invalid binary/null characters.")
+    if len(text) > MAX_KNOWLEDGE_CHARS:
+        raise KnowledgeGovernanceError(
+            f"Knowledge content exceeds the {MAX_KNOWLEDGE_CHARS:,}-character safety limit."
+        )
+    if not any(line.startswith("# ") for line in text.splitlines()):
+        raise KnowledgeGovernanceError("Knowledge documents must contain a top-level '# ' heading.")
+    return text
+
+
 def sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
@@ -75,9 +93,7 @@ def apply_proposal(
             "Knowledge document changed after this proposal was created. Review and create a fresh proposal."
         )
 
-    proposed = proposal.proposed_content
-    if not proposed.strip():
-        raise KnowledgeGovernanceError("A Knowledge document cannot be replaced with blank content.")
+    proposed = validate_knowledge_content(proposal.proposed_content)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
