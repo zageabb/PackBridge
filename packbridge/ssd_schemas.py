@@ -12,6 +12,7 @@ class SSDHeaderContext(BaseModel):
     supplier_name: str | None = None
     pickup_address: str | None = None
     supplier_contact: str | None = None
+    supplier_phone_email: str | None = None
     preliminary_final: str | None = None
     bu_details: str | None = None
     project_name: str | None = None
