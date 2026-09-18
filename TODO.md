@@ -35,7 +35,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Add drag/drop and file-picker upload.
 - [x] Store original source file unchanged.
 - [x] Implement digital PDF text extraction.
-- [ ] Implement PDF page rendering for source verification.
+- [x] Implement PDF page rendering for source verification.
 - [ ] Implement table/row extraction strategy.
 - [x] Add DOCX source extraction.
 - [x] Add XLSX/XLSM source extraction where needed.
