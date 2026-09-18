@@ -10,6 +10,7 @@ from packbridge.schemas import PackingList
 from .knowledge import context_for
 from .normalise import to_packing_list
 from .prompt_service import render_prompt
+from .postprocess import merge_continuation_packages
 from .runtime_settings import client
 from .validation import validate_packing_list
 
@@ -40,4 +41,7 @@ def map_packing_list(document_text: str, profile_hint: str = "") -> PackingList:
         raise MappingError(result.warning or result.error_code or "Local mapper failed.")
 
     packing = to_packing_list(result.value)
-    return validate_packing_list(packing)
+    packing, continuation_issues, _ = merge_continuation_packages(packing)
+    packing = validate_packing_list(packing)
+    packing.issues.extend(continuation_issues)
+    return packing
