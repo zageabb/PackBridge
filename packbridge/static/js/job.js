@@ -21,6 +21,7 @@
   const sourceOpenTab = document.getElementById("source-evidence-jump");
   const editorError = document.getElementById("field-editor-error");
   const revertButton = document.getElementById("field-editor-revert");
+  const learnButton = document.getElementById("field-editor-learn");
   const resizeHandle = document.getElementById("assistant-resize-handle");
   const processForm = document.getElementById("process-form");
   const progressPanel = document.getElementById("processing-progress");
@@ -197,7 +198,7 @@
     editorPath.value = button.dataset.path || "";
     editorValue.value = button.dataset.current || "";
     editorUnit.value = button.dataset.unit || "";
-    editorReason.value = "";
+    editorReason.value = button.dataset.reason || "";
     const source = button.dataset.source || "";
     const sourceUnit = button.dataset.sourceUnit || "";
     editorSource.textContent = source ? source + (sourceUnit ? " " + sourceUnit : "") : "—";
@@ -208,6 +209,14 @@
     editorRaw.hidden = !raw;
     sourceJump.hidden = !locator;
     sourceJump.dataset.locator = locator;
+    if (learnButton) {
+      learnButton.hidden = !(
+        button.dataset.modified === "1" &&
+        context.profileKnowledgePath
+      );
+      learnButton.dataset.path = button.dataset.path || "";
+      learnButton.dataset.note = button.dataset.reason || "";
+    }
     if (typeof editor.showModal === "function") {
       editor.showModal();
       editorValue.focus();
@@ -336,6 +345,41 @@
     } finally {
       submit.disabled = false;
       submit.textContent = original;
+    }
+  });
+
+  learnButton?.addEventListener("click", async () => {
+    const fieldPath = learnButton.dataset.path || editorPath.value || "";
+    if (!fieldPath) return;
+
+    const note = window.prompt(
+      "What should PackBridge learn from this correction? This creates a reviewable Knowledge proposal only.",
+      learnButton.dataset.note || editorReason.value || ""
+    );
+    if (note === null) return;
+
+    learnButton.disabled = true;
+    const original = learnButton.textContent;
+    learnButton.textContent = "Creating proposal…";
+    try {
+      const payload = await postJson(
+        "/jobs/" + context.id + "/learning/propose-field",
+        {
+          path: fieldPath,
+          note: note
+        }
+      );
+      editor.close();
+      if (window.confirm("Knowledge proposal created. Open Learning to review the diff?")) {
+        window.location.href = payload.learning_url;
+      } else {
+        window.location.reload();
+      }
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      learnButton.disabled = false;
+      learnButton.textContent = original;
     }
   });
 
