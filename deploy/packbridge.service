@@ -7,6 +7,7 @@ Type=simple
 WorkingDirectory=%h/ollama-chat/PackBridge
 Environment=PATH=%h/ollama-chat/PackBridge/.venv/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-%h/.config/packbridge/packbridge.env
+ExecStartPre=%h/ollama-chat/PackBridge/.venv/bin/python -m flask --app wsgi:application db upgrade
 ExecStart=%h/ollama-chat/PackBridge/.venv/bin/gunicorn --bind 0.0.0.0:5085 --workers 2 --timeout 600 wsgi:application
 Restart=on-failure
 RestartSec=3
