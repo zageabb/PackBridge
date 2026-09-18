@@ -18,6 +18,9 @@
   const sourceTitle = document.getElementById("source-evidence-title");
   const sourceSubtitle = document.getElementById("source-evidence-subtitle");
   const sourceResults = document.getElementById("source-evidence-results");
+  const sourcePagePane = document.getElementById("source-evidence-page-pane");
+  const sourcePageImage = document.getElementById("source-evidence-page-image");
+  const sourcePageLabel = document.getElementById("source-evidence-page-label");
   const sourceOpenTab = document.getElementById("source-evidence-jump");
   const editorError = document.getElementById("field-editor-error");
   const revertButton = document.getElementById("field-editor-revert");
@@ -238,6 +241,26 @@
       ? matches.length + " retained source section" + (matches.length === 1 ? "" : "s") + " matched."
       : "No retained source section matched this locator.";
     sourceResults.innerHTML = "";
+
+    const rendered = matches.find((match) => match.page_image_url);
+    if (sourcePagePane && sourcePageImage && sourcePageLabel) {
+      if (rendered) {
+        sourcePagePane.hidden = false;
+        sourcePageImage.src = rendered.page_image_url;
+        sourcePageImage.alt =
+          (rendered.document || "Source PDF") +
+          " — page " +
+          String(rendered.page_number || "");
+        sourcePageLabel.textContent =
+          (rendered.document || "Source PDF") +
+          " · Page " +
+          String(rendered.page_number || "");
+      } else {
+        sourcePagePane.hidden = true;
+        sourcePageImage.removeAttribute("src");
+        sourcePageLabel.textContent = "";
+      }
+    }
 
     matches.forEach((match) => {
       const article = document.createElement("article");
