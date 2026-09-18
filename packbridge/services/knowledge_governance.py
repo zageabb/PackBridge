@@ -87,6 +87,65 @@ def safe_knowledge_path(root: Path, relative: str, *, must_exist: bool = True) -
     return candidate
 
 
+def append_mapping_example(
+    current: str,
+    *,
+    field_path: str,
+    source_value,
+    working_value,
+    source_raw: str | None = None,
+    locator: str | None = None,
+    note: str | None = None,
+) -> tuple[str, str]:
+    payload = "|".join(
+        [
+            str(field_path),
+            repr(source_value),
+            repr(working_value),
+            str(source_raw or ""),
+            str(locator or ""),
+            str(note or ""),
+        ]
+    )
+    fingerprint = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    marker = f"<!-- packbridge-learning:{fingerprint} -->"
+    if marker in current:
+        raise KnowledgeGovernanceError("This mapping example is already present in the active profile.")
+
+    lines = [
+        "",
+        f"### Learned example — {field_path}",
+        "",
+        marker,
+        "",
+        f"- Canonical field: `{field_path}`",
+        f"- Source value: `{source_value}`",
+        f"- Expected working value: `{working_value}`",
+    ]
+    if locator:
+        lines.append(f"- Source locator: {locator}")
+    if note:
+        lines.append(f"- Operator note: {note}")
+    if source_raw:
+        lines.extend(
+            [
+                "",
+                "Source wording:",
+                "",
+                "~~~text",
+                str(source_raw).strip(),
+                "~~~",
+            ]
+        )
+
+    section_heading = "## Learned Mapping Examples"
+    proposed = current.rstrip()
+    if section_heading not in current:
+        proposed += "\n\n" + section_heading + "\n"
+    proposed += "\n" + "\n".join(lines).strip() + "\n"
+    return proposed, fingerprint
+
+
 def current_content(root: Path, relative: str) -> tuple[Path, str, str]:
     path = safe_knowledge_path(root, relative, must_exist=True)
     text = path.read_text(encoding="utf-8")
