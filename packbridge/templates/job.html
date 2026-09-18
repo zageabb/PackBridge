@@ -714,7 +714,13 @@
       </div>
       <button type="button" class="icon-btn" data-close-source-evidence>×</button>
     </div>
-    <div class="source-evidence-results" id="source-evidence-results"></div>
+    <div class="source-evidence-layout">
+      <div class="source-evidence-page-pane" id="source-evidence-page-pane" hidden>
+        <div class="source-evidence-page-label" id="source-evidence-page-label"></div>
+        <img id="source-evidence-page-image" alt="Rendered source PDF page">
+      </div>
+      <div class="source-evidence-results" id="source-evidence-results"></div>
+    </div>
     <div class="source-evidence-actions">
       <button type="button" class="btn btn-secondary" data-close-source-evidence>Close</button>
       <a class="btn btn-primary" id="source-evidence-jump" href="#source">Open Source tab</a>
