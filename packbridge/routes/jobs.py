@@ -17,7 +17,16 @@ from flask import (
 
 from packbridge.assistant_schemas import AssistantStructuredReply
 from packbridge.extensions import db
-from packbridge.models import AssistantProposalRecord, AuditEvent, ChatMessage, Job, SSDContextRecord, SourceChunk, SourceDocument
+from packbridge.models import (
+    AssistantProposalRecord,
+    AuditEvent,
+    ChatMessage,
+    Job,
+    SSDContextRecord,
+    SourceChunk,
+    SourceDocument,
+    ValidationAcknowledgement,
+)
 from packbridge.services.assistant_context import build_assistant_context
 from packbridge.services.document_ingestion import (
     ALLOWED_EXTENSIONS,
@@ -30,6 +39,13 @@ from packbridge.services.profile_matching import match_profile
 from packbridge.services.runtime_settings import client as ollama_client
 from packbridge.services.storage import save_job_upload
 from packbridge.services.ssd_preview import build_ssd_preview
+from packbridge.services.validation_acknowledgements import (
+    acknowledge_issue,
+    active_acknowledgements,
+    apply_acknowledgements,
+    issue_fingerprint,
+    revoke_acknowledgement,
+)
 from packbridge.services.source_evidence import find_source_evidence
 from packbridge.ssd_schemas import SSDCaseContext, SSDContext
 from packbridge.services.working_data import (
@@ -184,18 +200,30 @@ def upload():
 def view(job_id: int):
     job = Job.query.get_or_404(job_id)
     packing = _working(job)
-    packages = (packing or {}).get("packages", [])
-    selected, selected_index = _selected_package(packages, request.args.get("case"))
     counts = {"INFO": 0, "WARNING": 0, "BLOCKING": 0}
+    resolved_warning_count = 0
     ssd_context = _ssd_context(job)
     ssd_preview = None
+
     if job.working_json:
         try:
             working_model = load_packing(job.working_json)
+            acknowledgements = active_acknowledgements(job.id)
+            apply_acknowledgements(working_model, acknowledgements)
             counts = issue_counts(working_model)
+            resolved_warning_count = sum(
+                1 for issue in working_model.issues if issue.severity == "WARNING" and issue.resolved
+            )
             ssd_preview = build_ssd_preview(working_model, ssd_context)
+            packing = working_model.model_dump(mode="json")
+            for issue_dict, issue_model in zip(packing.get("issues", []), working_model.issues):
+                issue_dict["fingerprint"] = issue_fingerprint(issue_model)
         except (ValueError, TypeError):
             pass
+
+    packages = (packing or {}).get("packages", [])
+    selected, selected_index = _selected_package(packages, request.args.get("case"))
+
     audit_events = (
         AuditEvent.query.filter_by(job_id=job.id)
         .order_by(AuditEvent.id.desc())
@@ -210,6 +238,7 @@ def view(job_id: int):
         selected_package=selected,
         selected_package_index=selected_index,
         issue_counts=counts,
+        resolved_warning_count=resolved_warning_count,
         audit_events=audit_events,
         ssd_context=ssd_context,
         ssd_preview=ssd_preview,
@@ -449,6 +478,94 @@ def revert_working_job(job_id: int):
             "status": job.status,
         }
     )
+
+
+@bp.post("/<int:job_id>/issues/acknowledge")
+def acknowledge_validation_issue(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    if not job.working_json:
+        return jsonify({"error": "This job has no mapped working data."}), 409
+
+    payload = request.get_json(silent=True) or {}
+    fingerprint = str(payload.get("fingerprint") or "").strip()
+    reason = str(payload.get("reason") or "").strip()
+    actor = str(payload.get("actor") or "user").strip()[:120] or "user"
+
+    packing = load_packing(job.working_json)
+    current = next(
+        (issue for issue in packing.issues if issue_fingerprint(issue) == fingerprint),
+        None,
+    )
+    if current is None:
+        return jsonify({"error": "This validation issue is no longer current."}), 409
+    if current.severity != "WARNING":
+        return jsonify({"error": "Only warnings can be acknowledged. Blocking issues must be resolved."}), 400
+
+    try:
+        row = acknowledge_issue(job.id, current, reason=reason, actor=actor)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    db.session.add(row)
+    _audit(
+        job.id,
+        "validation_warning_acknowledged",
+        f"Acknowledged {current.code}",
+        {
+            "fingerprint": fingerprint,
+            "code": current.code,
+            "case_number": current.case_number,
+            "field_path": current.field_path,
+            "message": current.message,
+            "reason": reason or None,
+        },
+        actor=actor,
+    )
+    db.session.commit()
+
+    apply_acknowledgements(packing, active_acknowledgements(job.id))
+    return jsonify(
+        {
+            "ok": True,
+            "fingerprint": fingerprint,
+            "issue_counts": issue_counts(packing),
+            "resolved_warning_count": sum(
+                1 for issue in packing.issues if issue.severity == "WARNING" and issue.resolved
+            ),
+        }
+    )
+
+
+@bp.post("/<int:job_id>/issues/reopen")
+def reopen_validation_issue(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    payload = request.get_json(silent=True) or {}
+    fingerprint = str(payload.get("fingerprint") or "").strip()
+    actor = str(payload.get("actor") or "user").strip()[:120] or "user"
+
+    row = ValidationAcknowledgement.query.filter_by(
+        job_id=job.id,
+        issue_fingerprint=fingerprint,
+        status="active",
+    ).first()
+    if row is None:
+        return jsonify({"error": "No active acknowledgement exists for this warning."}), 404
+
+    revoke_acknowledgement(row, actor=actor)
+    _audit(
+        job.id,
+        "validation_warning_reopened",
+        f"Reopened {row.issue_code}",
+        {
+            "fingerprint": fingerprint,
+            "code": row.issue_code,
+            "case_number": row.case_number,
+            "field_path": row.field_path,
+        },
+        actor=actor,
+    )
+    db.session.commit()
+    return jsonify({"ok": True, "fingerprint": fingerprint})
 
 
 @bp.post("/<int:job_id>/ssd-context")
