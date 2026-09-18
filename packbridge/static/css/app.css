@@ -912,3 +912,17 @@ body.resizing-assistant {
     flex-direction: column;
   }
 }
+
+
+.template-clean-action {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #c7d8eb;
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+.template-clean-action p {
+  margin: 0 0 10px;
+  color: var(--text);
+  line-height: 1.5;
+}
