@@ -583,3 +583,38 @@ body.resizing-assistant {
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px rgba(49, 92, 141, .15);
 }
+
+
+.source-reference pre {
+  margin: 7px 0 0;
+  padding: 9px 10px;
+  max-height: 130px;
+  overflow: auto;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid var(--line);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+}
+.source-jump {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--accent-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 0 0;
+  cursor: pointer;
+}
+.source-jump:hover {
+  text-decoration: underline;
+}
+.source-highlight {
+  animation: source-highlight 2.2s ease;
+}
+@keyframes source-highlight {
+  0%, 100% { box-shadow: none; }
+  15%, 70% { box-shadow: 0 0 0 3px rgba(49, 92, 141, .22); border-color: var(--accent-2); }
+}
