@@ -90,7 +90,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Add Issues tab.
 - [x] Add Source tab.
 - [x] Add Output Preview tab.
-- [ ] Add source-verification popup with source page next to Virtual SSD data.
+- [x] Add source-verification popup with source page next to Virtual SSD data.
 
 ## Phase 6 — Validation
 
@@ -109,11 +109,11 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 - [x] Add job-scoped chat.
 - [x] Pass selected case/field as assistant context.
-- [ ] Allow "where did this come from?" evidence queries.
-- [ ] Explain validation failures.
+- [x] Allow "where did this come from?" evidence queries.
+- [x] Explain validation failures.
 - [ ] Answer structured shipment questions through application tools/data.
-- [ ] Add assistant-proposed data changes with Apply/Cancel.
-- [ ] Add assistant-generated clarification questions during processing.
+- [x] Add assistant-proposed data changes with Apply/Cancel.
+- [x] Add assistant-generated clarification questions during processing.
 - [x] Persist job chat.
 - [ ] Add reprocess field/case actions.
 - [x] Ensure the assistant cannot directly mutate the SSD workbook.
@@ -159,7 +159,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [ ] Add backup/restore process.
 - [ ] Add application logging.
 - [x] Add health checks.
-- [ ] Add automated deployment consistent with local Ubuntu environment. *(5085 systemd/UDA deployment package prepared; live registration still pending)*
+- [ ] Add automated deployment consistent with local Ubuntu environment. *(5085 is now the PackBridge application port; systemd/UDA deployment package prepared, live registration still pending)*
 - [ ] Create production handover guide.
 
 ## Phase 11 — Testing and benchmark
