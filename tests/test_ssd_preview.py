@@ -121,3 +121,52 @@ def test_preview_flags_unverified_ssd_list_value():
     preview = build_ssd_preview(packing, context)
 
     assert any("Packaging Material" in issue for issue in preview.rows[0].issues)
+
+
+
+def test_case_override_takes_precedence_over_job_defaults():
+    packing = PackingList(
+        packages=[
+            Package(
+                case_number=field("CASE-9"),
+                dimensions=Dimensions(
+                    length=field(10),
+                    width=field(20),
+                    height=field(30),
+                    unit="CM",
+                ),
+                net_weight=field(5, "KG"),
+                gross_weight=field(6, "KG"),
+            )
+        ]
+    )
+    context = SSDContext(
+        defaults=SSDCaseContext(
+            content_description="QBANK",
+            equipment_group="011",
+            declare_as="System",
+            purchase_order="4500000001",
+            purchase_order_position="10",
+            storage_requirement="Outdoor",
+            packaging_material="PALLET",
+            stackability="Stackable 1 tier",
+            dangerous_goods="N",
+        ),
+        case_overrides={
+            "CASE-9": SSDCaseContext(
+                packaging_material="WOODEN_BOX",
+                stackability="Not stackable",
+                remarks="Oversize case",
+            )
+        },
+    )
+
+    preview = build_ssd_preview(packing, context)
+    row = preview.rows[0]
+
+    assert row.columns["T"] == "WOODEN_BOX"
+    assert row.columns["U"] == "Not stackable"
+    assert row.columns["X"] == "Oversize case"
+    assert row.columns["D"] == "QBANK"
+    assert row.origins["T"] == "case_override"
+    assert row.origins["D"] == "ssd_context"
