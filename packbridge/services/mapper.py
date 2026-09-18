@@ -4,6 +4,7 @@ import json
 import re
 from copy import deepcopy
 from pathlib import Path
+from typing import Callable
 
 from flask import current_app
 
@@ -319,7 +320,12 @@ def _map_segment(
     return result.value
 
 
-def map_packing_list(document_text: str, profile_hint: str = "") -> PackingList:
+def map_packing_list(
+    document_text: str,
+    profile_hint: str = "",
+    *,
+    progress_callback: Callable[[str, int, int], None] | None = None,
+) -> PackingList:
     knowledge_root = Path(current_app.config["KNOWLEDGE_ROOT"])
     query = "packing list package case gross net dimensions items UOM"
     if profile_hint:
@@ -330,20 +336,30 @@ def map_packing_list(document_text: str, profile_hint: str = "") -> PackingList:
     # are segmented rather than silently truncated.
     target = min(MAX_MAPPING_TEXT, SEGMENT_TARGET_CHARS)
     segments = split_mapping_segments(document_text, target_chars=target)
-    mapped_segments = [
-        _map_segment(
-            segment,
-            profile_hint=profile_hint,
-            knowledge=knowledge,
-            segment_number=index,
-            segment_count=len(segments),
+    mapped_segments = []
+    segment_count = len(segments)
+    for index, segment in enumerate(segments, start=1):
+        if progress_callback is not None:
+            progress_callback("mapping", index - 1, segment_count)
+        mapped_segments.append(
+            _map_segment(
+                segment,
+                profile_hint=profile_hint,
+                knowledge=knowledge,
+                segment_number=index,
+                segment_count=segment_count,
+            )
         )
-        for index, segment in enumerate(segments, start=1)
-    ]
+        if progress_callback is not None:
+            progress_callback("mapping", index, segment_count)
 
+    if progress_callback is not None:
+        progress_callback("merging", segment_count, segment_count)
     merged_result, merge_conflicts = merge_mapper_results(mapped_segments)
     packing = to_packing_list(merged_result)
     packing, continuation_issues, _ = merge_continuation_packages(packing)
+    if progress_callback is not None:
+        progress_callback("validating", segment_count, segment_count)
     packing = validate_packing_list(packing)
     packing.issues.extend(continuation_issues)
     packing.issues.extend(
