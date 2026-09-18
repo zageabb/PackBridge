@@ -12,6 +12,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     url_for,
 )
 
@@ -42,6 +43,7 @@ from packbridge.services.knowledge_governance import (
 )
 from packbridge.services.mapper import MappingError, map_packing_list
 from packbridge.services.prompt_service import load_prompt
+from packbridge.services.pdf_rendering import PDFRenderingError, render_pdf_page
 from packbridge.services.profile_matching import match_profile
 from packbridge.services.runtime_settings import client as ollama_client
 from packbridge.services.storage import save_job_upload
@@ -1244,6 +1246,56 @@ def reject_assistant_proposal(job_id: int, proposal_id: int):
     return jsonify({"ok": True, "proposal": _proposal_dict(proposal)})
 
 
+def _page_from_locator(locator: str) -> int | None:
+    value = str(locator or "").strip()
+    if not value.casefold().startswith("page "):
+        return None
+    token = value[5:].split(",", 1)[0].strip()
+    try:
+        page = int(token)
+    except ValueError:
+        return None
+    return page if page > 0 else None
+
+
+@bp.get("/<int:job_id>/documents/<int:document_id>/pages/<int:page_number>.png")
+def source_page_image(job_id: int, document_id: int, page_number: int):
+    Job.query.get_or_404(job_id)
+    document = SourceDocument.query.filter_by(id=document_id, job_id=job_id).first_or_404()
+
+    source = Path(document.path).resolve()
+    data_root = Path(current_app.config["DATA_ROOT"]).resolve()
+    if data_root != source and data_root not in source.parents:
+        return jsonify({"error": "Source document path is outside PackBridge storage."}), 403
+    if source.suffix.casefold() != ".pdf":
+        return jsonify({"error": "Page rendering is only available for PDF sources."}), 400
+    if not source.is_file():
+        return jsonify({"error": "Source PDF is no longer available."}), 404
+
+    destination = (
+        data_root
+        / "jobs"
+        / str(job_id)
+        / "rendered"
+        / f"document-{document_id}-page-{page_number}.png"
+    )
+    try:
+        if (
+            not destination.is_file()
+            or destination.stat().st_mtime < source.stat().st_mtime
+        ):
+            render_pdf_page(source, destination, page_number)
+    except (PDFRenderingError, OSError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return send_file(
+        destination,
+        mimetype="image/png",
+        conditional=True,
+        max_age=3600,
+    )
+
+
 @bp.get("/<int:job_id>/source-evidence")
 def source_evidence(job_id: int):
     Job.query.get_or_404(job_id)
@@ -1252,6 +1304,25 @@ def source_evidence(job_id: int):
         return jsonify({"error": "A source locator is required."}), 400
 
     matches = find_source_evidence(job_id, locator, limit=5)
+    for match in matches:
+        page_number = _page_from_locator(match.get("locator") or locator)
+        document = SourceDocument.query.filter_by(
+            id=match.get("document_id"),
+            job_id=job_id,
+        ).first()
+        if (
+            page_number
+            and document is not None
+            and Path(document.original_name).suffix.casefold() == ".pdf"
+        ):
+            match["page_number"] = page_number
+            match["page_image_url"] = url_for(
+                "jobs.source_page_image",
+                job_id=job_id,
+                document_id=document.id,
+                page_number=page_number,
+            )
+
     if not matches:
         return jsonify(
             {
