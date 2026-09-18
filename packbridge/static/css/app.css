@@ -1430,3 +1430,24 @@ body.resizing-assistant {
     max-height: 52vh;
   }
 }
+
+
+.learning-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.learning-banner-actions form {
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .learning-banner-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .learning-banner-actions .btn {
+    width: 100%;
+    text-align: center;
+  }
+}
