@@ -57,7 +57,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Capture source evidence.
 - [x] Support package continuation across pages.
 - [ ] Add staged/chunked processing for large documents.
-- [ ] Preserve manual edits on safe reprocessing or explicitly warn before overwrite.
+- [x] Preserve manual edits on safe reprocessing or explicitly warn before overwrite.
 
 ## Phase 4 — Knowledge loader and profiles
 
@@ -75,6 +75,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 ## Phase 5 — Virtual SSD
 
 - [x] Add SSD project/default context separate from source evidence.
+- [x] Add case-specific SSD output overrides that inherit job defaults.
 
 - [x] Create Summary tab.
 - [x] Create case tabs / searchable case selector.
@@ -88,7 +89,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Add Previous/Next case navigation.
 - [x] Add Issues tab.
 - [x] Add Source tab.
-- [ ] Add Output Preview tab.
+- [x] Add Output Preview tab.
 - [ ] Add source-verification popup with source page next to Virtual SSD data.
 
 ## Phase 6 — Validation
@@ -96,13 +97,13 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [ ] Implement gross >= net weight rule with override support.
 - [ ] Validate dimensions and units.
 - [x] Validate package identifiers and duplicates.
-- [ ] Validate continuation-page grouping.
+- [x] Validate continuation-page grouping.
 - [x] Validate item quantities/UOMs.
-- [ ] Validate required SSD fields.
+- [x] Validate required SSD fields.
 - [x] Add INFO/WARNING/BLOCKING severities.
 - [x] Revalidate immediately after working-data edits.
 - [ ] Add warning acknowledgement/override audit where appropriate.
-- [ ] Prevent normal generation while unresolved blocking issues remain.
+- [x] Prevent normal generation while unresolved blocking issues remain.
 
 ## Phase 7 — Context-aware assistant
 
@@ -131,34 +132,34 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 ## Phase 9 — SSD generator
 
-- [ ] Add SSD/project aggregation to support assembling multiple packing-list jobs into one workbook.
+- [x] Add SSD/project aggregation to support assembling multiple packing-list jobs into one workbook.
 - [x] Add structural SSD template inspection and controlled template installation.
 
 - [x] Inspect and document reference SSD workbook structure.
-- [ ] Establish approved clean SSD template.
+- [ ] Establish approved clean SSD template. *(controlled cleaner/derivation implemented; live approved template still needs deployment/acceptance)*
 - [x] Implement template version management.
-- [ ] Implement deterministic canonical → SSD mapping.
-- [ ] Write only permitted values/locations.
-- [ ] Preserve required formatting/formulas/validations/named structures.
+- [ ] Implement deterministic canonical → SSD mapping. *(verified SoCs package/project mapping implemented; detailed PL/ML item mapping still pending)*
+- [x] Write only permitted values/locations.
+- [x] Preserve required formatting/formulas/validations/named structures.
 - [ ] Generate XLSX without macros if SAP validation confirms this is acceptable.
-- [ ] Run post-generation workbook structural checks.
-- [ ] Store output metadata/hash with job.
-- [ ] Provide final download only after generation checks pass.
+- [x] Run post-generation workbook structural checks.
+- [x] Store output metadata/hash with SSD project.
+- [ ] Provide final production download only after generation checks pass. *(verified validation-workbook download implemented; SAP approval still pending)*
 
 ## Phase 10 — Audit, security and production readiness
 
 - [x] Add job audit timeline.
 - [x] Record model/version used.
 - [ ] Record knowledge/profile version.
-- [ ] Record template version.
+- [x] Record template version.
 - [x] Record every user/assistant-approved change.
 - [ ] Add user authentication if required for production deployment.
 - [ ] Add role/permission design for edit/approve/knowledge administration.
 - [ ] Define file-retention policy.
 - [ ] Add backup/restore process.
 - [ ] Add application logging.
-- [ ] Add health checks.
-- [ ] Add automated deployment consistent with local Ubuntu environment.
+- [x] Add health checks.
+- [ ] Add automated deployment consistent with local Ubuntu environment. *(5085 systemd/UDA deployment package prepared; live registration still pending)*
 - [ ] Create production handover guide.
 
 ## Phase 11 — Testing and benchmark
@@ -168,7 +169,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Add continuation-page regression tests.
 - [x] Add source-vs-working edit tests.
 - [x] Add validation tests.
-- [ ] Add SSD structure regression tests.
+- [x] Add SSD structure regression tests.
 - [ ] Benchmark 14B baseline.
 - [ ] Benchmark 7B candidate against same tests.
 - [ ] Measure extraction accuracy, package grouping, line-item accuracy and latency.
