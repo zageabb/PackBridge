@@ -78,7 +78,19 @@ def _current_value(field: FieldValue) -> Any:
     return None
 
 
-def _coerce_like(existing: Any, value: Any) -> Any:
+_NUMERIC_FIELD_NAMES = {
+    "gross_weight",
+    "net_weight",
+    "volume",
+    "length",
+    "width",
+    "height",
+    "quantity",
+    "sequence",
+}
+
+
+def _coerce_like(path: str, existing: Any, value: Any) -> Any:
     if value is None:
         return None
     if isinstance(value, str):
@@ -87,6 +99,12 @@ def _coerce_like(existing: Any, value: Any) -> Any:
             return None
     else:
         stripped = value
+
+    field_name = path.rsplit(".", 1)[-1]
+    field_name = field_name.split("[", 1)[0]
+
+    if field_name not in _NUMERIC_FIELD_NAMES:
+        return str(stripped)
 
     if isinstance(existing, bool):
         text = str(stripped).casefold()
@@ -102,13 +120,10 @@ def _coerce_like(existing: Any, value: Any) -> Any:
         except ValueError as exc:
             raise WorkingDataError("Enter a whole number.") from exc
 
-    if isinstance(existing, float):
-        try:
-            return float(str(stripped).replace(",", ""))
-        except ValueError as exc:
-            raise WorkingDataError("Enter a numeric value.") from exc
-
-    return stripped
+    try:
+        return float(str(stripped).replace(",", ""))
+    except ValueError as exc:
+        raise WorkingDataError("Enter a numeric value.") from exc
 
 
 def set_field(
@@ -129,7 +144,7 @@ def set_field(
 
     source_value, source_unit = _source_value(field)
     existing = _current_value(field)
-    coerced = _coerce_like(existing if existing is not None else source_value, value)
+    coerced = _coerce_like(path, existing if existing is not None else source_value, value)
     working_unit = unit if unit is not None else (
         field.working.unit if field.working is not None else source_unit
     )
