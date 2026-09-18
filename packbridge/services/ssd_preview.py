@@ -155,6 +155,7 @@ def build_ssd_preview(packing: PackingList, context: SSDContext | None = None) -
         "E12": header.supplier_name or supplier_from_source,
         "E13": header.pickup_address,
         "E15": header.supplier_contact,
+        "E16": header.supplier_phone_email,
         "E17": header.preliminary_final,
         "T6": header.bu_details,
         "T8": header.contact_person_number,
