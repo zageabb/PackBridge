@@ -27,7 +27,7 @@ from packbridge.services.profile_matching import match_profile
 from packbridge.services.runtime_settings import client as ollama_client
 from packbridge.services.storage import save_job_upload
 from packbridge.services.ssd_preview import build_ssd_preview
-from packbridge.ssd_schemas import SSDContext
+from packbridge.ssd_schemas import SSDCaseContext, SSDContext
 from packbridge.services.working_data import (
     WorkingDataError,
     dump_packing,
@@ -209,6 +209,13 @@ def view(job_id: int):
         audit_events=audit_events,
         ssd_context=ssd_context,
         ssd_preview=ssd_preview,
+        selected_ssd_override=(
+            ssd_context.case_overrides.get(
+                str((((selected or {}).get("case_number") or {}).get("working") or {}).get("value") or "")
+            )
+            if selected
+            else None
+        ),
     )
 
 
@@ -522,6 +529,131 @@ def update_ssd_context(job_id: int):
     db.session.commit()
     flash("SSD project/default context saved.", "success")
     return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
+
+
+@bp.post("/<int:job_id>/ssd-context/case")
+def update_ssd_case_context(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    if not job.working_json:
+        flash("Map the packing list before adding a case-specific SSD override.", "warning")
+        return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
+
+    case_number = _form_text("case_number")
+    if not case_number:
+        flash("Case number is required for an SSD override.", "danger")
+        return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
+
+    packing = load_packing(job.working_json)
+    available_cases = {
+        str(package.case_number.working.value)
+        for package in packing.packages
+        if package.case_number.working and package.case_number.working.value not in (None, "")
+    }
+    if case_number not in available_cases:
+        flash("The selected case is not present in the current working dataset.", "danger")
+        return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
+
+    context = _ssd_context(job)
+    values = (
+        context.case_overrides.get(case_number).model_dump()
+        if case_number in context.case_overrides
+        else {}
+    )
+
+    fields = (
+        "content_description",
+        "equipment_group",
+        "declare_as",
+        "purchase_order",
+        "purchase_order_position",
+        "pickup_week_planned",
+        "pickup_week_actual",
+        "storage_requirement",
+        "packaging_material",
+        "stackability",
+        "dangerous_goods",
+        "item_designation",
+        "remarks",
+    )
+    for name in fields:
+        values[name] = _form_text("case_" + name)
+
+    border_value = _form_text("case_border_crossing_value")
+    if border_value is None:
+        values["border_crossing_value"] = None
+    else:
+        try:
+            values["border_crossing_value"] = float(border_value.replace(",", ""))
+        except ValueError:
+            flash("Case Border Crossing Value must be numeric.", "danger")
+            return redirect(
+                url_for("jobs.view", job_id=job.id, case=case_number) + "#output-preview"
+            )
+
+    override = SSDCaseContext.model_validate(values)
+    if any(value not in (None, "") for value in override.model_dump().values()):
+        context.case_overrides[case_number] = override
+        action = "updated"
+    else:
+        context.case_overrides.pop(case_number, None)
+        action = "cleared"
+
+    record = SSDContextRecord.query.filter_by(job_id=job.id).first()
+    if record is None:
+        record = SSDContextRecord(job_id=job.id)
+        db.session.add(record)
+    record.context_json = context.model_dump_json()
+    record.updated_by = "user"
+    _audit(
+        job.id,
+        "ssd_case_context_updated",
+        f"SSD case override {action} for {case_number}",
+        {
+            "case_number": case_number,
+            "action": action,
+            "fields": [
+                name for name, value in override.model_dump().items()
+                if value not in (None, "")
+            ],
+        },
+        actor="user",
+    )
+    db.session.commit()
+    flash(f"SSD case override {action} for {case_number}.", "success")
+    return redirect(url_for("jobs.view", job_id=job.id, case=case_number) + "#output-preview")
+
+
+@bp.post("/<int:job_id>/ssd-context/case/reset")
+def reset_ssd_case_context(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    case_number = _form_text("case_number")
+    if not case_number:
+        flash("Case number is required.", "danger")
+        return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
+
+    context = _ssd_context(job)
+    existed = context.case_overrides.pop(case_number, None) is not None
+    record = SSDContextRecord.query.filter_by(job_id=job.id).first()
+    if record is None:
+        record = SSDContextRecord(job_id=job.id)
+        db.session.add(record)
+    record.context_json = context.model_dump_json()
+    record.updated_by = "user"
+    if existed:
+        _audit(
+            job.id,
+            "ssd_case_context_reset",
+            f"Reset SSD case override for {case_number}",
+            {"case_number": case_number},
+            actor="user",
+        )
+    db.session.commit()
+    flash(
+        f"SSD case override reset for {case_number}." if existed
+        else f"No SSD case override existed for {case_number}.",
+        "success",
+    )
+    return redirect(url_for("jobs.view", job_id=job.id, case=case_number) + "#output-preview")
 
 
 @bp.post("/<int:job_id>/chat")
