@@ -254,15 +254,18 @@
           <div class="issue-chips">
             <span class="issue-chip blocking">{{ issue_counts.BLOCKING }} blocking</span>
             <span class="issue-chip warning">{{ issue_counts.WARNING }} warning</span>
+            {% if resolved_warning_count %}<span class="issue-chip acknowledged">{{ resolved_warning_count }} acknowledged</span>{% endif %}
             <span class="issue-chip info">{{ issue_counts.INFO }} info</span>
           </div>
         </div>
         {% if packing.issues %}
           <div class="issues-list">
           {% for issue in packing.issues %}
-            <article class="issue-item {{ issue.severity|lower }}">
-              <div class="issue-severity">{{ issue.severity }}</div>
-              <div>
+            <article class="issue-item {{ issue.severity|lower }} {% if issue.resolved %}resolved{% endif %}" data-issue-fingerprint="{{ issue.fingerprint or '' }}">
+              <div class="issue-severity">
+                {% if issue.resolved %}ACKNOWLEDGED{% else %}{{ issue.severity }}{% endif %}
+              </div>
+              <div class="issue-item-body">
                 <strong>{{ issue.code }}</strong>
                 <p>{{ issue.message }}</p>
                 <small>
@@ -270,6 +273,15 @@
                   {% if issue.field_path %}{% if issue.case_number %} • {% endif %}{{ issue.field_path }}{% endif %}
                 </small>
               </div>
+              {% if issue.severity == 'WARNING' and issue.fingerprint %}
+                <div class="issue-actions">
+                  {% if issue.resolved %}
+                    <button class="btn btn-secondary btn-small" type="button" data-reopen-warning data-fingerprint="{{ issue.fingerprint }}">Reopen</button>
+                  {% else %}
+                    <button class="btn btn-secondary btn-small" type="button" data-ack-warning data-fingerprint="{{ issue.fingerprint }}" data-code="{{ issue.code }}">Acknowledge</button>
+                  {% endif %}
+                </div>
+              {% endif %}
             </article>
           {% endfor %}
           </div>
