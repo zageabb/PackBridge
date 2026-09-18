@@ -3,6 +3,10 @@ import xml.etree.ElementTree as ET
 
 from packbridge.services.ssd_template import inspect_template
 from packbridge.services.template_cleaner import create_clean_generation_template
+from packbridge.services.ssd_writer import write_socs_preview
+from packbridge.schemas import Dimensions, FieldValue, Package, PackingList, SourceValue, WorkingValue
+from packbridge.ssd_schemas import SSDCaseContext, SSDContext, SSDHeaderContext
+from packbridge.services.ssd_preview import build_ssd_preview
 
 
 MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -161,3 +165,76 @@ def test_cleaner_removes_generated_sheets_and_case_values(tmp_path):
         assert values["E12"]["inline"] is None
         assert values["S23"]["inline"] is None
         assert values["M23"]["formula"] == "J23*K23*L23/1000000"
+
+
+
+def test_guarded_writer_populates_clean_template_and_preserves_vba(tmp_path):
+    populated = tmp_path / "populated.xlsm"
+    clean = tmp_path / "clean.xlsm"
+    output = tmp_path / "validation-output.xlsm"
+    make_populated_template(populated)
+    create_clean_generation_template(populated, clean)
+
+    def field(value, unit=None):
+        return FieldValue(
+            source=SourceValue(value=value, unit=unit),
+            working=WorkingValue(value=value, unit=unit, origin="source"),
+        )
+
+    packing = PackingList(
+        packages=[
+            Package(
+                case_number=field("NEW-CASE"),
+                dimensions=Dimensions(
+                    length=field(100),
+                    width=field(200),
+                    height=field(300),
+                    unit="CM",
+                ),
+                net_weight=field(50, "KG"),
+                gross_weight=field(60, "KG"),
+            )
+        ]
+    )
+    context = SSDContext(
+        header=SSDHeaderContext(
+            supplier_name="Supplier A",
+            project_name="Project A",
+            delivery_location="Site A",
+        ),
+        defaults=SSDCaseContext(
+            content_description="QBANK",
+            equipment_group="011",
+            declare_as="System",
+            purchase_order="4500000001",
+            purchase_order_position="10",
+            storage_requirement="Outdoor",
+            packaging_material="PALLET",
+            stackability="Stackable 1 tier",
+            dangerous_goods="N",
+        ),
+    )
+    preview = build_ssd_preview(packing, context)
+    assert preview.blocking == []
+
+    result = write_socs_preview(clean, output, preview)
+
+    assert result["rows_written"] == 1
+    assert result["has_vba"] is True
+    after = inspect_template(output)
+    assert after.compatible is True
+    assert after.existing_case_count == 1
+    assert after.socs_headers["S21"] == "Case Number"
+
+    with zipfile.ZipFile(output) as archive:
+        root = ET.fromstring(archive.read("xl/worksheets/sheet1.xml"))
+        ns = {"m": MAIN}
+        cells = {
+            cell.attrib.get("r"): cell
+            for cell in root.findall(".//m:c", ns)
+        }
+        assert cells["S23"].find("m:is/m:t", ns).text == "NEW-CASE"
+        assert cells["D23"].find("m:is/m:t", ns).text == "QBANK"
+        assert cells["N23"].find("m:v", ns).text == "50"
+        assert cells["O23"].find("m:v", ns).text == "60"
+        assert cells["M23"].find("m:f", ns).text == "J23*K23*L23/1000000"
