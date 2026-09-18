@@ -63,6 +63,8 @@ A read-only Knowledge browser and search page are now available. Governed Knowle
 
 The Virtual SSD is now an editable working-data layer rather than display-only.
 
+A separate SSD project/default context layer has also been added so output-only values are not falsely attributed to the packing-list source.
+
 Implemented:
 
 - shipment/package summary
@@ -157,20 +159,40 @@ The following remain deliberately deferred:
 - assistant Apply/Cancel data-change proposals
 - warning override/acknowledgement workflow
 - Learning/Knowledge amendment approvals and versioning
-- final canonical-to-SSD cell/range mapping
+- the remaining non-source/project canonical-to-SSD mappings
+- multi-packing-list/project aggregation
 - final SSD generation
 - SAP import acceptance validation
+
+## SSD reverse engineering completed in this slice
+
+The reference packing list and reference SSD workbook were inspected directly.
+
+Verified findings include:
+
+- the PDF is 20 pages but represents 17 unique cases;
+- cases 48366844, 48366845 and 48366846 continue onto a second page;
+- the SSD workbook contains 68 SoCs package rows across several positions, so one packing list is only part of the complete SSD;
+- SoCs_Temp is the central package dataset;
+- PLs_Temp and MLs_Temp are very-hidden templates;
+- the workbook contains generated PL/ML sheets and VBA that creates/refreshes them and produces PDFs;
+- the first safe direct canonical mappings are dimensions, volume formula, net/gross weights and case number;
+- at least one historical SSD row differs from the supplied source packing list, confirming that the historical workbook must not be treated as golden truth.
+
+A controlled template inspector and versioned template installer are now implemented. It distinguishes structural compatibility from a clean generation template.
+
+The job workspace now includes a deterministic read-only SoCs output preview and forms for SSD-specific project/default values.
 
 ## Next development slice
 
 1. Deploy/run PackBridge on port 5085.
-2. Upload the real reference HE packing list.
-3. Run `qwen3:14b` through the generic mapper.
-4. Compare the result against the expected 17-case reference and continuation-page behaviour.
-5. Fix any real-document extraction/mapping issues.
-6. Add source-verification navigation/popups and clarification handling.
-7. Add assistant proposed changes with explicit Apply/Cancel.
-8. Formally inspect the SSD workbook and define the deterministic output mapping before enabling generation.
+2. Process the real reference HE packing list through qwen3:14b and compare the mapped result against the known 17-case shape.
+3. Add per-case SSD context overrides and project/workspace aggregation.
+4. Add assistant proposed changes with explicit Apply/Cancel.
+5. Build a controlled clean SSD template from the verified workbook structure.
+6. Implement the first deterministic SoCs writer against a copied macro-enabled template.
+7. Re-open and verify every generated value/structure before enabling the download button.
+8. Test the resulting workbook through the actual SAP import before considering a macro-free XLSX path.
 
 ## Current design constraint
 
