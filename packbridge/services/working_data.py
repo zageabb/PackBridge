@@ -223,9 +223,11 @@ def revert_all(packing: PackingList) -> tuple[PackingList, int]:
     return packing, changed
 
 
-def issue_counts(packing: PackingList) -> dict[str, int]:
+def issue_counts(packing: PackingList, *, include_resolved: bool = False) -> dict[str, int]:
     counts = {"INFO": 0, "WARNING": 0, "BLOCKING": 0}
     for issue in packing.issues:
+        if issue.resolved and not include_resolved:
+            continue
         counts[issue.severity] = counts.get(issue.severity, 0) + 1
     return counts
 
