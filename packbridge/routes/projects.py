@@ -155,6 +155,7 @@ def update_context(project_id: int):
         supplier_name=_text("header_supplier_name"),
         pickup_address=_text("header_pickup_address"),
         supplier_contact=_text("header_supplier_contact"),
+        supplier_phone_email=_text("header_supplier_phone_email"),
         preliminary_final=_text("header_preliminary_final"),
         bu_details=_text("header_bu_details"),
         project_name=_text("header_project_name"),
