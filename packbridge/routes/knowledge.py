@@ -61,6 +61,8 @@ def index():
     root = _root()
     query = request.args.get("q", "").strip()
     selected_path = request.args.get("path", "").strip()
+    job_id_raw = request.args.get("job", "").strip()
+    job_id = int(job_id_raw) if job_id_raw.isdigit() else None
 
     if query:
         hits = search(root, query, limit=50)
@@ -126,6 +128,7 @@ def index():
         selected=selected,
         query=query,
         proposals=proposals,
+        job_id=job_id,
     )
 
 
