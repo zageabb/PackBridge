@@ -1,4 +1,6 @@
-from pydantic import BaseModel\n\nfrom packbridge.services.ollama_client import OllamaClient
+from pydantic import BaseModel
+
+from packbridge.services.ollama_client import OllamaClient
 
 
 class FakeResponse:
@@ -43,7 +45,6 @@ def test_list_models_returns_names():
     result = client.list_models()
 
     assert result.value == ["qwen3:14b", "qwen3:8b"]
-
 
 
 class StructuredReply(BaseModel):
