@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 
@@ -14,8 +15,9 @@ from flask import (
     url_for,
 )
 
+from packbridge.assistant_schemas import AssistantStructuredReply
 from packbridge.extensions import db
-from packbridge.models import AuditEvent, ChatMessage, Job, SSDContextRecord, SourceChunk, SourceDocument
+from packbridge.models import AssistantProposalRecord, AuditEvent, ChatMessage, Job, SSDContextRecord, SourceChunk, SourceDocument
 from packbridge.services.document_ingestion import (
     ALLOWED_EXTENSIONS,
     DocumentIngestionError,
@@ -657,6 +659,65 @@ def reset_ssd_case_context(job_id: int):
     return redirect(url_for("jobs.view", job_id=job.id, case=case_number) + "#output-preview")
 
 
+def _proposal_dict(record: AssistantProposalRecord | None) -> dict | None:
+    if record is None:
+        return None
+    try:
+        changes = json.loads(record.changes_json)
+    except json.JSONDecodeError:
+        changes = []
+    return {
+        "id": record.id,
+        "status": record.status,
+        "changes": changes,
+        "created_at": record.created_at.isoformat(),
+        "decided_at": record.decided_at.isoformat() if record.decided_at else None,
+        "decided_by": record.decided_by,
+    }
+
+
+def _validate_assistant_changes(job: Job, proposed_changes) -> list[dict]:
+    if not job.working_json:
+        return []
+
+    packing = load_packing(job.working_json)
+    validated = []
+    seen_paths: set[str] = set()
+
+    for proposed in proposed_changes:
+        path = str(proposed.path or "").strip()
+        if (
+            not path
+            or path in seen_paths
+            or ".source" in path
+            or ".working" in path
+            or path.startswith("_")
+        ):
+            continue
+        try:
+            packing, change = set_field(
+                packing,
+                path,
+                proposed.value,
+                unit=proposed.unit,
+                actor="assistant-proposal",
+                reason=proposed.reason,
+            )
+        except (WorkingDataError, ValueError, TypeError):
+            continue
+        seen_paths.add(path)
+        validated.append(
+            {
+                "path": path,
+                "value": change["after"]["value"],
+                "unit": change["after"]["unit"],
+                "reason": proposed.reason,
+                "before": change["before"],
+            }
+        )
+    return validated
+
+
 @bp.post("/<int:job_id>/chat")
 def chat(job_id: int):
     job = Job.query.get_or_404(job_id)
@@ -695,31 +756,148 @@ def chat(job_id: int):
     system_prompt = (
         load_prompt("job_assistant")
         + "\n\nCURRENT JOB CONTEXT:\n"
-        + json.dumps(job_context, default=str)[:60_000]
+        + json.dumps(job_context, default=str)[:45_000]
     )
-    result = ollama_client().chat(history, system_prompt=system_prompt)
 
-    if result.available:
-        answer = str(result.value)
+    client = ollama_client()
+    structured = client.chat_json(
+        history,
+        AssistantStructuredReply,
+        system_prompt=system_prompt,
+    )
+
+    proposal_changes = []
+    if structured.available:
+        reply = structured.value
+        answer = reply.message
+        if reply.clarification_question:
+            answer += "\n\n" + reply.clarification_question
+        proposal_changes = _validate_assistant_changes(job, reply.proposed_changes)
     else:
-        answer = f"Local assistant unavailable: {result.warning or result.error_code}"
-
-    db.session.add(
-        ChatMessage(
-            job_id=job.id,
-            role="assistant",
-            content=answer,
-            context_json=json.dumps(context),
+        fallback = client.chat(history, system_prompt=system_prompt)
+        answer = (
+            str(fallback.value)
+            if fallback.available
+            else f"Local assistant unavailable: {fallback.warning or structured.warning or fallback.error_code or structured.error_code}"
         )
+
+    assistant_message = ChatMessage(
+        job_id=job.id,
+        role="assistant",
+        content=answer,
+        context_json=json.dumps(context),
     )
+    db.session.add(assistant_message)
+    db.session.flush()
+
+    proposal = None
+    if proposal_changes:
+        proposal = AssistantProposalRecord(
+            job_id=job.id,
+            assistant_message_id=assistant_message.id,
+            status="pending",
+            changes_json=json.dumps(proposal_changes, default=str),
+        )
+        db.session.add(proposal)
+        db.session.flush()
+
     _audit(
         job.id,
         "assistant_message",
         "Assistant responded to job question",
-        {"context": context},
+        {
+            "context": context,
+            "proposal_id": proposal.id if proposal else None,
+            "proposed_change_count": len(proposal_changes),
+        },
     )
     db.session.commit()
-    return jsonify({"message": answer})
+    return jsonify({"message": answer, "proposal": _proposal_dict(proposal)})
+
+
+@bp.post("/<int:job_id>/proposals/<int:proposal_id>/apply")
+def apply_assistant_proposal(job_id: int, proposal_id: int):
+    job = Job.query.get_or_404(job_id)
+    proposal = AssistantProposalRecord.query.filter_by(
+        id=proposal_id,
+        job_id=job.id,
+    ).first_or_404()
+
+    if proposal.status != "pending":
+        return jsonify({"error": f"Proposal is already {proposal.status}."}), 409
+    if not job.working_json:
+        return jsonify({"error": "This job has no editable working data."}), 409
+
+    try:
+        changes = json.loads(proposal.changes_json)
+    except json.JSONDecodeError:
+        return jsonify({"error": "Proposal change data is invalid."}), 409
+
+    packing = load_packing(job.working_json)
+    applied = []
+    try:
+        for change in changes:
+            packing, result = set_field(
+                packing,
+                str(change.get("path") or ""),
+                change.get("value"),
+                unit=change.get("unit"),
+                actor="assistant-approved",
+                reason=str(change.get("reason") or "Approved assistant proposal"),
+            )
+            applied.append(result)
+    except (WorkingDataError, ValueError, TypeError) as exc:
+        return jsonify({"error": f"Proposal can no longer be safely applied: {exc}"}), 409
+
+    _save_working(job, packing)
+    proposal.status = "applied"
+    proposal.decided_at = datetime.now(timezone.utc)
+    proposal.decided_by = "user"
+    _audit(
+        job.id,
+        "assistant_proposal_applied",
+        f"Applied assistant proposal {proposal.id}",
+        {
+            "proposal_id": proposal.id,
+            "changes": applied,
+            "issues": issue_counts(packing),
+        },
+        actor="user",
+    )
+    db.session.commit()
+    return jsonify(
+        {
+            "ok": True,
+            "proposal": _proposal_dict(proposal),
+            "issue_counts": issue_counts(packing),
+            "status": job.status,
+        }
+    )
+
+
+@bp.post("/<int:job_id>/proposals/<int:proposal_id>/reject")
+def reject_assistant_proposal(job_id: int, proposal_id: int):
+    job = Job.query.get_or_404(job_id)
+    proposal = AssistantProposalRecord.query.filter_by(
+        id=proposal_id,
+        job_id=job.id,
+    ).first_or_404()
+
+    if proposal.status != "pending":
+        return jsonify({"error": f"Proposal is already {proposal.status}."}), 409
+
+    proposal.status = "rejected"
+    proposal.decided_at = datetime.now(timezone.utc)
+    proposal.decided_by = "user"
+    _audit(
+        job.id,
+        "assistant_proposal_rejected",
+        f"Rejected assistant proposal {proposal.id}",
+        {"proposal_id": proposal.id},
+        actor="user",
+    )
+    db.session.commit()
+    return jsonify({"ok": True, "proposal": _proposal_dict(proposal)})
 
 
 @bp.get("/<int:job_id>/chat/history")
@@ -733,8 +911,10 @@ def chat_history(job_id: int):
                     "role": row.role,
                     "content": row.content,
                     "created_at": row.created_at.isoformat(),
+                    "proposal": _proposal_dict(row.proposal),
                 }
                 for row in messages
             ]
         }
     )
+
