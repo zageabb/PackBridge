@@ -213,3 +213,13 @@ def issue_counts(packing: PackingList) -> dict[str, int]:
     for issue in packing.issues:
         counts[issue.severity] = counts.get(issue.severity, 0) + 1
     return counts
+
+
+def has_modifications(value: Any) -> bool:
+    if isinstance(value, FieldValue):
+        return bool(value.modified)
+    if isinstance(value, list):
+        return any(has_modifications(item) for item in value)
+    if isinstance(value, BaseModel):
+        return any(has_modifications(getattr(value, field_name)) for field_name in value.model_fields)
+    return False
