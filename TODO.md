@@ -68,9 +68,9 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [ ] Parse/validate structured YAML/JSON rule blocks.
 - [x] Select only relevant knowledge for each prompt.
 - [ ] Support approved few-shot examples.
-- [ ] Add Knowledge browser/editor. *(read-only browser complete; governed editing still pending)*
-- [ ] Add validation before activating changed knowledge.
-- [ ] Add import/export/replace workflow for remote support.
+- [x] Add Knowledge browser/editor. *(governed proposal/approval editing implemented)*
+- [ ] Add validation before activating changed knowledge. *(Markdown safety/content validation implemented; structured YAML/JSON rule validation still pending)*
+- [x] Add import/export/replace workflow for remote support.
 
 ## Phase 5 — Virtual SSD
 
@@ -94,7 +94,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 ## Phase 6 — Validation
 
-- [ ] Implement gross >= net weight rule with override support.
+- [x] Implement gross >= net weight rule with override support.
 - [ ] Validate dimensions and units.
 - [x] Validate package identifiers and duplicates.
 - [x] Validate continuation-page grouping.
@@ -102,7 +102,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Validate required SSD fields.
 - [x] Add INFO/WARNING/BLOCKING severities.
 - [x] Revalidate immediately after working-data edits.
-- [ ] Add warning acknowledgement/override audit where appropriate.
+- [x] Add warning acknowledgement/override audit where appropriate.
 - [x] Prevent normal generation while unresolved blocking issues remain.
 
 ## Phase 7 — Context-aware assistant
@@ -122,13 +122,13 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 - [ ] Detect unrecognised/new document layouts.
 - [ ] Let user resolve unknown mappings.
-- [ ] Propose additions to vendor/document Knowledge.
+- [x] Propose additions to vendor/document Knowledge.
 - [ ] Default correction scope to current document only.
 - [ ] Allow explicit "apply to profile" approval.
 - [ ] Version Knowledge profile changes.
-- [ ] Keep knowledge change audit history.
+- [x] Keep knowledge change audit history.
 - [ ] Generate profile/examples from an approved new-document learning session.
-- [ ] Add compare/diff view before approving Knowledge changes.
+- [x] Add compare/diff view before approving Knowledge changes.
 
 ## Phase 9 — SSD generator
 
