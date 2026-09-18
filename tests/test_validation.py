@@ -115,3 +115,46 @@ def test_supported_units_do_not_raise_unit_warnings():
     codes = issue_codes(packing)
     assert not any(code.endswith("_UNIT_MISSING") for code in codes)
     assert not any(code.endswith("_UNIT_UNKNOWN") for code in codes)
+
+
+
+def test_ambiguous_source_mapping_requires_review_until_user_changes_working_value():
+    from packbridge.schemas import Evidence, SourceValue
+
+    ambiguous = FieldValue(
+        source=SourceValue(
+            value="Shipping Mass",
+            evidence=[
+                Evidence(
+                    locator="Page 1",
+                    raw_text="Shipping Mass: 100 KG",
+                    status="AMBIGUOUS",
+                )
+            ],
+        ),
+        working=WorkingValue(value="Shipping Mass", origin="source"),
+    )
+    packing = PackingList(
+        shipment={"description": ambiguous},
+        packages=[
+            Package(
+                case_number=field("C-AMB"),
+                gross_weight=field(100, "KG"),
+                net_weight=field(90, "KG"),
+            )
+        ],
+    )
+
+    validate_packing_list(packing)
+    ambiguity = [issue for issue in packing.issues if issue.code == "MAPPING_AMBIGUOUS"]
+    assert len(ambiguity) == 1
+    assert ambiguity[0].field_path == "shipment.description"
+
+    packing.shipment.description.working = WorkingValue(
+        value="Confirmed description",
+        origin="user_edit",
+        modified_by="user",
+    )
+    packing.shipment.description.modified = True
+    validate_packing_list(packing)
+    assert "MAPPING_AMBIGUOUS" not in issue_codes(packing)
