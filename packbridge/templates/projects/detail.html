@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}PackBridge — {{ project.name }}{% endblock %}
+
+{% block content %}
+<section class="page-heading project-heading">
+  <div>
+    <div class="eyebrow">SSD PROJECT</div>
+    <h1>{{ project.name }}</h1>
+    <p>{{ project.reference or "No project reference" }}{% if project.description %} · {{ project.description }}{% endif %}</p>
+  </div>
+  <div class="issue-chips">
+    <span class="issue-chip info">{{ project.job_links|length }} job(s)</span>
+    <span class="issue-chip info">{{ total_packages }} package(s)</span>
+    {% if preview.blocking %}<span class="issue-chip blocking">{{ preview.blocking|length }} blocking</span>{% endif %}
+    {% if preview.warnings %}<span class="issue-chip warning">{{ preview.warnings|length }} warning</span>{% endif %}
+  </div>
+</section>
+
+<section class="card">
+  <div class="section-heading">
+    <div>
+      <h2>Packing-list jobs</h2>
+      <p>Ordering here becomes the package-row ordering in the combined SoCs preview.</p>
+    </div>
+  </div>
+
+  {% if project.job_links %}
+  <div class="table-wrap">
+    <table class="data-table compact">
+      <thead><tr><th>Order</th><th>Job</th><th>Sales order</th><th>Vendor</th><th>Status</th><th>Packages</th><th></th></tr></thead>
+      <tbody>
+      {% for link in project.job_links %}
+        {% set job = link.job %}
+        {% set working = job.working_json %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><a href="{{ url_for('jobs.view', job_id=job.id) }}">{{ job.title }}</a></td>
+          <td>{{ job.sales_order or "—" }}</td>
+          <td>{{ job.vendor or "—" }}</td>
+          <td><span class="status status-{{ job.status|replace('_','-') }}">{{ job.status|replace('_',' ') }}</span></td>
+          <td>
+            {% set matching_rows = preview.rows|selectattr('source_job_id', 'equalto', job.id)|list %}
+            {{ matching_rows|length }}
+          </td>
+          <td>
+            <form method="post" action="{{ url_for('projects.detach_job', project_id=project.id, job_id=job.id) }}">
+              <button class="btn btn-secondary btn-small" type="submit">Remove</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty-state compact-empty"><strong>No jobs attached.</strong><span>Add mapped packing-list jobs below.</span></div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('projects.attach_job', project_id=project.id) }}" class="attach-job-form">
+    <select name="job_id" required>
+      <option value="">Choose mapped job…</option>
+      {% for job in available_jobs %}
+        <option value="{{ job.id }}">{{ job.title }}{% if job.sales_order %} — {{ job.sales_order }}{% endif %}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-primary" type="submit" {% if not available_jobs %}disabled{% endif %}>Add job</button>
+  </form>
+  {% if not available_jobs %}<p class="muted">No unassigned mapped jobs are currently available.</p>{% endif %}
+</section>
+
+<section class="card" id="project-preview">
+  <div class="section-heading">
+    <div>
+      <h2>Combined SSD context</h2>
+      <p>Project/header and default package values apply across all attached jobs. A job's canonical PO/position is retained when the project defaults are blank.</p>
+    </div>
+  </div>
+
+  <details class="ssd-context-panel" {% if preview.warnings or not preview.rows %}open{% endif %}>
+    <summary>Project/default values</summary>
+    <form method="post" action="{{ url_for('projects.update_context', project_id=project.id) }}" class="ssd-context-form">
+      <fieldset>
+        <legend>Project / header</legend>
+        <label><span>Project Name</span><input name="header_project_name" value="{{ context.header.project_name or '' }}"></label>
+        <label><span>Delivery Location</span><input name="header_delivery_location" value="{{ context.header.delivery_location or '' }}"></label>
+        <label><span>Supplier Name</span><input name="header_supplier_name" value="{{ context.header.supplier_name or '' }}"></label>
+        <label><span>Currency</span><input name="header_currency" value="{{ context.header.currency or '' }}"></label>
+        <label><span>BU Details</span><input name="header_bu_details" value="{{ context.header.bu_details or '' }}"></label>
+        <label><span>Preliminary / Final</span>
+          <select name="header_preliminary_final">
+            <option value=""></option>
+            <option value="P" {% if context.header.preliminary_final == 'P' %}selected{% endif %}>P — Preliminary</option>
+            <option value="F" {% if context.header.preliminary_final == 'F' %}selected{% endif %}>F — Final</option>
+          </select>
+        </label>
+        <label><span>Pick-up Address</span><input name="header_pickup_address" value="{{ context.header.pickup_address or '' }}"></label>
+        <label><span>Supplier Contact</span><input name="header_supplier_contact" value="{{ context.header.supplier_contact or '' }}"></label>
+        <label><span>Contact Person &amp; Number</span><input name="header_contact_person_number" value="{{ context.header.contact_person_number or '' }}"></label>
+        <label><span>Supplier Reference</span><input name="header_supplier_reference" value="{{ context.header.supplier_reference or '' }}"></label>
+        <label class="wide"><span>Other Remarks</span><input name="header_other_remarks" value="{{ context.header.other_remarks or '' }}"></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Default package values</legend>
+        <label><span>Content Description</span><input name="default_content_description" value="{{ context.defaults.content_description or '' }}"></label>
+        <label><span>EQ Group</span><input name="default_equipment_group" value="{{ context.defaults.equipment_group or '' }}"></label>
+        <label><span>HE PO Number</span><input name="default_purchase_order" value="{{ context.defaults.purchase_order or '' }}"></label>
+        <label><span>PO Position</span><input name="default_purchase_order_position" value="{{ context.defaults.purchase_order_position or '' }}"></label>
+        <label><span>Declare As</span>
+          <select name="default_declare_as"><option value=""></option>{% for value in ['System','Loose Parts'] %}<option value="{{ value }}" {% if context.defaults.declare_as == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select>
+        </label>
+        <label><span>Storage Requirement</span>
+          <select name="default_storage_requirement"><option value=""></option>{% for value in ['Outdoor','Outdoor covered','Indoor','Indoor heated'] %}<option value="{{ value }}" {% if context.defaults.storage_requirement == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select>
+        </label>
+        <label><span>Packaging Material</span>
+          <select name="default_packaging_material"><option value=""></option>{% for value in ['PALLET','CARTON_BOX','WOODEN_FRAME','BUNDLE','WOODEN_BOX','DRUM','UNPACKED'] %}<option value="{{ value }}" {% if context.defaults.packaging_material == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select>
+        </label>
+        <label><span>Stackability</span>
+          <select name="default_stackability"><option value=""></option>{% for value in ['Stackable 1 tier','Stackable 2 tier','Stackable 3 tier','Not stackable'] %}<option value="{{ value }}" {% if context.defaults.stackability == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select>
+        </label>
+        <label><span>Dangerous Goods</span>
+          <select name="default_dangerous_goods"><option value=""></option><option value="N" {% if context.defaults.dangerous_goods == 'N' %}selected{% endif %}>N</option><option value="Y" {% if context.defaults.dangerous_goods == 'Y' %}selected{% endif %}>Y</option></select>
+        </label>
+        <label><span>Border Crossing Value</span><input name="default_border_crossing_value" value="{{ context.defaults.border_crossing_value if context.defaults.border_crossing_value is not none else '' }}"></label>
+        <label><span>Pickup Week Planned</span><input name="default_pickup_week_planned" value="{{ context.defaults.pickup_week_planned or '' }}"></label>
+        <label><span>Pickup Week Actual</span><input name="default_pickup_week_actual" value="{{ context.defaults.pickup_week_actual or '' }}"></label>
+        <label><span>Item Designation</span><input name="default_item_designation" value="{{ context.defaults.item_designation or '' }}"></label>
+        <label class="wide"><span>Remarks</span><input name="default_remarks" value="{{ context.defaults.remarks or '' }}"></label>
+      </fieldset>
+      <div class="ssd-context-actions">
+        <span>Project context is output data, kept separate from packing-list source evidence.</span>
+        <button class="btn btn-primary" type="submit">Save project context</button>
+      </div>
+    </form>
+  </details>
+
+  {% if preview.blocking or preview.warnings %}
+  <div class="preview-messages">
+    {% for message in preview.blocking %}<div class="preview-message blocking">{{ message }}</div>{% endfor %}
+    {% for message in preview.warnings %}<div class="preview-message warning">{{ message }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if preview.rows %}
+  <div class="table-wrap preview-table-wrap">
+    <table class="data-table compact preview-table">
+      <thead>
+        <tr>
+          <th>Row</th><th>Source job</th><th>C Qty</th><th>D Content</th><th>E EQ</th><th>G Declare</th><th>H PO</th><th>I Pos</th>
+          <th>J L</th><th>K W</th><th>L H</th><th>M Vol</th><th>N Net</th><th>O Gross</th>
+          <th>R Storage</th><th>S Case</th><th>T Packaging</th><th>U Stack</th><th>V DG</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in preview.rows %}
+        <tr class="{% if row.missing_context or row.issues %}preview-row-warning{% endif %}">
+          <td>{{ row.excel_row or '—' }}</td>
+          <td><a href="{{ url_for('jobs.view', job_id=row.source_job_id) }}">{{ row.source_job_title }}</a></td>
+          {% for column in ['C','D','E','G','H','I','J','K','L','M','N','O','R','S','T','U','V'] %}
+          <td title="{{ row.origins.get(column, '') }}">{{ row.columns.get(column) if row.columns.get(column) is not none else '—' }}</td>
+          {% endfor %}
+        </tr>
+        {% if row.missing_context or row.issues %}
+        <tr class="preview-detail-row"><td colspan="19">
+          {% if row.missing_context %}<strong>Needs context:</strong> {{ row.missing_context|join(', ') }}{% endif %}
+          {% if row.issues %}<span>{% if row.missing_context %} • {% endif %}{{ row.issues|join(' • ') }}</span>{% endif %}
+        </td></tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty-state compact-empty">Attach mapped packing-list jobs to build the combined SSD preview.</div>
+  {% endif %}
+
+  <div class="project-generation-bar">
+    <div>
+      <strong>SSD generation remains locked</strong>
+      <span>The combined preview now reflects the workbook architecture, but output stays disabled until a clean controlled template and writer verification are complete.</span>
+    </div>
+    <button class="btn btn-primary" type="button" disabled>Generate SSD</button>
+  </div>
+</section>
+{% endblock %}
