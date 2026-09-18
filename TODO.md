@@ -41,7 +41,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Add XLSX/XLSM source extraction where needed.
 - [ ] Add optional local OCR/vision path for scanned documents.
 - [x] Store page/section/table evidence metadata.
-- [ ] Show visible processing progress steps.
+- [x] Show visible processing progress steps.
 
 ## Phase 3 — Canonical schema and mapper
 
@@ -120,12 +120,12 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 ## Phase 8 — Learning
 
-- [ ] Detect unrecognised/new document layouts.
+- [x] Detect unrecognised/new document layouts.
 - [ ] Let user resolve unknown mappings.
 - [x] Propose additions to vendor/document Knowledge.
-- [ ] Default correction scope to current document only.
+- [x] Default correction scope to current document only.
 - [ ] Allow explicit "apply to profile" approval.
-- [ ] Version Knowledge profile changes.
+- [x] Version Knowledge profile changes.
 - [x] Keep knowledge change audit history.
 - [ ] Generate profile/examples from an approved new-document learning session.
 - [x] Add compare/diff view before approving Knowledge changes.
