@@ -63,6 +63,8 @@ class MappedOrder(BaseModel):
     position: MappedValue = Field(default_factory=MappedValue)
     project: MappedValue = Field(default_factory=MappedValue)
     customer_project: MappedValue = Field(default_factory=MappedValue)
+    purchase_order: MappedValue = Field(default_factory=MappedValue)
+    purchase_order_position: MappedValue = Field(default_factory=MappedValue)
 
 
 class MappedShipment(BaseModel):
