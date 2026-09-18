@@ -21,7 +21,8 @@ Recommended first deployment:
 - SQLite;
 - local filesystem storage;
 - Ollama on the same server or trusted LAN endpoint;
-- browser access from the local network.
+- browser access from the local network;
+- PackBridge web port **5085** for the initial Ubuntu deployment.
 
 ## Configuration
 
