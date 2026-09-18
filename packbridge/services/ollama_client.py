@@ -136,6 +136,36 @@ class OllamaClient:
             endpoint="/api/chat",
         )
 
+    def chat_json(
+        self,
+        messages: list[dict[str, str]],
+        response_model: type[BaseModel],
+        system_prompt: str = "",
+    ) -> OllamaResult:
+        bounded = []
+        if system_prompt:
+            bounded.append({"role": "system", "content": system_prompt[:45_000]})
+        for message in messages[-24:]:
+            role = str(message.get("role") or "user")
+            msg_content = str(message.get("content") or "")[:30_000]
+            bounded.append({"role": role, "content": msg_content})
+
+        result = self._request(
+            "/api/chat",
+            json_body={
+                "model": self.model,
+                "messages": bounded,
+                "stream": False,
+                "format": response_model.model_json_schema(),
+                "options": {"temperature": 0},
+            },
+        )
+        if not result.available:
+            return result
+        message = result.value.get("message")
+        msg_content = message.get("content") if isinstance(message, dict) else None
+        return self._parse_json(result, msg_content, response_model)
+
     def _request(
         self,
         endpoint: str,
@@ -195,7 +225,9 @@ class OllamaClient:
         if not isinstance(content, str) or not content.strip():
             return self._invalid(result, "Ollama response contains no JSON content.")
         text = content.strip()
-        if text.startswith("~~~") and text.endswith("~~~"):
+        fenced_tilde = text.startswith("~~~") and text.endswith("~~~")
+        fenced_backtick = text.startswith(chr(96) * 3) and text.endswith(chr(96) * 3)
+        if fenced_tilde or fenced_backtick:
             lines = text.splitlines()
             if len(lines) >= 3:
                 text = "\n".join(lines[1:-1]).strip()
