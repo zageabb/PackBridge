@@ -106,6 +106,17 @@
           <div><dt>Structure fingerprint</dt><dd><code>{{ inspection.structural_fingerprint[:16] }}…</code></dd></div>
           <div><dt>File SHA-256</dt><dd><code>{{ inspection.sha256[:16] }}…</code></dd></div>
         </dl>
+        {% if inspection.compatible and not inspection.generation_ready %}
+          <div class="template-clean-action">
+            <p>
+              This workbook matches the verified SSD structure but still contains generated PL/ML sheets or existing SoCs case data.
+              PackBridge can derive a separate clean generation template without overwriting the uploaded source workbook.
+            </p>
+            <form method="post" action="{{ url_for('settings.template_clean') }}" onsubmit="return window.confirm('Create and activate a cleaned generation template from this workbook? The uploaded source template will be retained.');">
+              <button class="btn btn-primary" type="submit">Create clean generation template</button>
+            </form>
+          </div>
+        {% endif %}
         {% if inspection.errors %}
           <div class="template-errors">
             {% for error in inspection.errors %}<div>{{ error }}</div>{% endfor %}
