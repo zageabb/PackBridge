@@ -79,3 +79,27 @@ class AuditEvent(db.Model):
     payload_json = db.Column(db.Text)
     actor = db.Column(db.String(120), nullable=False, default="system")
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class SSDContextRecord(db.Model):
+    __tablename__ = "ssd_context_records"
+
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(
+        db.Integer,
+        db.ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    context_json = db.Column(db.Text, nullable=False, default="{}")
+    updated_by = db.Column(db.String(120), nullable=False, default="user")
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+    )
+
+    job = db.relationship("Job", backref=db.backref("ssd_context_record", uselist=False))
