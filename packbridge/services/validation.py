@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from numbers import Number
 
+from pydantic import BaseModel
+
 from packbridge.schemas import FieldValue, MappingIssue, PackingList
 
 
@@ -47,6 +49,57 @@ def _case_number(package) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _field_has_ambiguous_source(field: FieldValue) -> bool:
+    if field.working is not None and field.working.origin != "source":
+        return False
+    if field.source is None:
+        return False
+    return any(item.status == "AMBIGUOUS" for item in field.source.evidence)
+
+
+def _ambiguous_mapping_issues(value, path: str = "", case_number: str | None = None) -> list[MappingIssue]:
+    issues: list[MappingIssue] = []
+
+    if isinstance(value, FieldValue):
+        if _field_has_ambiguous_source(value):
+            issues.append(
+                MappingIssue(
+                    code="MAPPING_AMBIGUOUS",
+                    severity="WARNING",
+                    message="The source mapper marked this field as ambiguous. Confirm or edit the working value.",
+                    case_number=case_number,
+                    field_path=path or None,
+                )
+            )
+        return issues
+
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            child_path = f"{path}[{index}]" if path else f"[{index}]"
+            child_case = case_number
+            if hasattr(item, "case_number"):
+                child_case = _case_number(item)
+            issues.extend(_ambiguous_mapping_issues(item, child_path, child_case))
+        return issues
+
+    if isinstance(value, BaseModel):
+        local_case = case_number
+        if hasattr(value, "case_number"):
+            local_case = _case_number(value)
+        for field_name in value.__class__.model_fields:
+            if field_name == "issues":
+                continue
+            child_path = f"{path}.{field_name}" if path else field_name
+            issues.extend(
+                _ambiguous_mapping_issues(
+                    getattr(value, field_name),
+                    child_path,
+                    local_case,
+                )
+            )
+    return issues
 
 
 def validate_packing_list(packing: PackingList) -> PackingList:
@@ -271,5 +324,6 @@ def validate_packing_list(packing: PackingList) -> PackingList:
                     )
                 )
 
+    issues.extend(_ambiguous_mapping_issues(packing))
     packing.issues = issues
     return packing
