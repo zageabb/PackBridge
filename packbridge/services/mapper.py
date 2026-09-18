@@ -324,6 +324,7 @@ def map_packing_list(
     document_text: str,
     profile_hint: str = "",
     *,
+    profile_path: str | None = None,
     progress_callback: Callable[[str, int, int], None] | None = None,
 ) -> PackingList:
     knowledge_root = Path(current_app.config["KNOWLEDGE_ROOT"])
@@ -331,6 +332,22 @@ def map_packing_list(
     if profile_hint:
         query += " " + profile_hint
     knowledge = context_for(knowledge_root, query, limit=8, max_chars=35_000)
+
+    if profile_path:
+        candidate = (knowledge_root / profile_path).resolve()
+        if (
+            candidate.is_file()
+            and (candidate == knowledge_root or knowledge_root in candidate.parents)
+            and candidate.suffix.casefold() == ".md"
+        ):
+            profile_text = candidate.read_text(encoding="utf-8")
+            explicit_profile = (
+                f"<active_document_profile path={profile_path!r}>\n"
+                f"{profile_text[:30000]}\n"
+                "</active_document_profile>"
+            )
+            if profile_text[:500] not in knowledge:
+                knowledge = explicit_profile + "\n\n" + knowledge
 
     # Keep the original single-call path for ordinary documents. Larger documents
     # are segmented rather than silently truncated.
