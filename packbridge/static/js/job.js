@@ -14,6 +14,11 @@
   const editorLocator = document.getElementById("field-editor-locator");
   const editorRaw = document.getElementById("field-editor-raw");
   const sourceJump = document.getElementById("field-editor-source-jump");
+  const sourceDialog = document.getElementById("source-evidence-dialog");
+  const sourceTitle = document.getElementById("source-evidence-title");
+  const sourceSubtitle = document.getElementById("source-evidence-subtitle");
+  const sourceResults = document.getElementById("source-evidence-results");
+  const sourceOpenTab = document.getElementById("source-evidence-jump");
   const editorError = document.getElementById("field-editor-error");
   const revertButton = document.getElementById("field-editor-revert");
   const resizeHandle = document.getElementById("assistant-resize-handle");
@@ -89,21 +94,82 @@
     button.addEventListener("click", () => editor.close());
   });
 
-  sourceJump?.addEventListener("click", () => {
+  function renderSourceEvidence(locator, matches) {
+    sourceTitle.textContent = locator || "Source section";
+    sourceSubtitle.textContent = matches.length
+      ? matches.length + " retained source section" + (matches.length === 1 ? "" : "s") + " matched."
+      : "No retained source section matched this locator.";
+    sourceResults.innerHTML = "";
+
+    matches.forEach((match) => {
+      const article = document.createElement("article");
+      article.className = "source-evidence-result";
+
+      const header = document.createElement("div");
+      header.className = "source-evidence-result-header";
+      const label = document.createElement("strong");
+      label.textContent = match.locator || locator;
+      const documentName = document.createElement("span");
+      documentName.textContent = match.document || "Source document";
+      header.append(label, documentName);
+
+      const pre = document.createElement("pre");
+      pre.textContent = match.text || "";
+
+      article.append(header, pre);
+      sourceResults.appendChild(article);
+    });
+  }
+
+  async function openSourceEvidence(locator) {
+    if (!locator || !sourceDialog) return;
+    sourceTitle.textContent = locator;
+    sourceSubtitle.textContent = "Loading retained source evidence…";
+    sourceResults.innerHTML = "";
+    try {
+      const response = await fetch(
+        "/jobs/" + context.id + "/source-evidence?locator=" + encodeURIComponent(locator)
+      );
+      const payload = await response.json().catch(() => ({}));
+      renderSourceEvidence(locator, payload.matches || []);
+      sourceOpenTab.href = "#source";
+      if (typeof sourceDialog.showModal === "function") {
+        sourceDialog.showModal();
+      }
+    } catch (error) {
+      renderSourceEvidence(locator, []);
+      sourceSubtitle.textContent = "Source evidence could not be loaded: " + error;
+      if (typeof sourceDialog.showModal === "function") {
+        sourceDialog.showModal();
+      }
+    }
+  }
+
+  sourceJump?.addEventListener("click", async () => {
     const locator = sourceJump.dataset.locator || "";
     if (!locator) return;
+    editor.close();
+    await openSourceEvidence(locator);
+  });
+
+  document.querySelectorAll("[data-close-source-evidence]").forEach((button) => {
+    button.addEventListener("click", () => sourceDialog?.close());
+  });
+
+  sourceOpenTab?.addEventListener("click", () => {
+    sourceDialog?.close();
+    const locator = sourceTitle.textContent || "";
     const target = Array.from(document.querySelectorAll("[data-source-locator]"))
       .find((node) => {
         const candidate = node.dataset.sourceLocator || "";
         return candidate === locator || candidate.startsWith(locator + ",") || locator.startsWith(candidate + ",");
       });
-    editor.close();
     if (target) {
-      target.scrollIntoView({behavior: "smooth", block: "center"});
-      target.classList.add("source-highlight");
-      window.setTimeout(() => target.classList.remove("source-highlight"), 2200);
-    } else {
-      window.location.hash = "source";
+      window.setTimeout(() => {
+        target.scrollIntoView({behavior: "smooth", block: "center"});
+        target.classList.add("source-highlight");
+        window.setTimeout(() => target.classList.remove("source-highlight"), 2200);
+      }, 80);
     }
   });
 
