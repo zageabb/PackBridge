@@ -40,7 +40,7 @@ def render_pdf_page(
         matrix = fitz.Matrix(scale, scale)
         pixmap = page.get_pixmap(matrix=matrix, alpha=False)
         temporary = destination.with_suffix(destination.suffix + ".tmp")
-        pixmap.save(temporary)
+        temporary.write_bytes(pixmap.tobytes("png"))
         temporary.replace(destination)
     finally:
         document.close()
