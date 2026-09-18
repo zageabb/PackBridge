@@ -152,3 +152,123 @@ def test_case_specific_ssd_override_round_trip(tmp_path):
     )
     assert reset.status_code == 200
     assert b"override active" not in reset.data
+
+
+
+def test_assistant_proposal_requires_explicit_apply_or_reject(tmp_path):
+    TestConfig = type(
+        "TestConfig",
+        (Config,),
+        {
+            "TESTING": True,
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///" + str(tmp_path / "test.sqlite3"),
+            "DATA_ROOT": tmp_path / "data",
+            "KNOWLEDGE_ROOT": tmp_path / "knowledge",
+            "TEMPLATE_ROOT": tmp_path / "templates",
+        },
+    )
+    app = create_app(TestConfig)
+
+    from packbridge.models import AssistantProposalRecord, ChatMessage
+    from packbridge.schemas import FieldValue, Package, PackingList, SourceValue, WorkingValue
+    import json
+
+    def field(value, unit=None):
+        return FieldValue(
+            source=SourceValue(value=value, unit=unit),
+            working=WorkingValue(value=value, unit=unit, origin="source"),
+        )
+
+    with app.app_context():
+        packing = PackingList(
+            packages=[
+                Package(
+                    case_number=field("CASE-1"),
+                    gross_weight=field(10, "KG"),
+                    net_weight=field(9, "KG"),
+                )
+            ]
+        )
+        job = Job(title="Proposal Job", status="mapped", working_json=packing.model_dump_json())
+        db.session.add(job)
+        db.session.flush()
+        message = ChatMessage(job_id=job.id, role="assistant", content="I can propose that change.")
+        db.session.add(message)
+        db.session.flush()
+        proposal = AssistantProposalRecord(
+            job_id=job.id,
+            assistant_message_id=message.id,
+            status="pending",
+            changes_json=json.dumps(
+                [
+                    {
+                        "path": "packages[0].gross_weight",
+                        "value": 12,
+                        "unit": "KG",
+                        "reason": "User asked to correct the gross weight.",
+                        "before": {"value": 10, "unit": "KG", "modified": False},
+                    }
+                ]
+            ),
+        )
+        db.session.add(proposal)
+        db.session.commit()
+        job_id = job.id
+        proposal_id = proposal.id
+
+    client = app.test_client()
+
+    # Merely creating the proposal does not mutate working data.
+    with app.app_context():
+        unchanged = Job.query.get(job_id)
+        current = PackingList.model_validate_json(unchanged.working_json)
+        assert current.packages[0].gross_weight.working.value == 10
+
+    applied = client.post(
+        f"/jobs/{job_id}/proposals/{proposal_id}/apply",
+        json={},
+    )
+    assert applied.status_code == 200
+    assert applied.get_json()["proposal"]["status"] == "applied"
+
+    with app.app_context():
+        changed = Job.query.get(job_id)
+        current = PackingList.model_validate_json(changed.working_json)
+        assert current.packages[0].gross_weight.source.value == 10
+        assert current.packages[0].gross_weight.working.value == 12
+        assert current.packages[0].gross_weight.modified is True
+
+        reject_message = ChatMessage(job_id=job_id, role="assistant", content="Another proposal")
+        db.session.add(reject_message)
+        db.session.flush()
+        rejected_proposal = AssistantProposalRecord(
+            job_id=job_id,
+            assistant_message_id=reject_message.id,
+            status="pending",
+            changes_json=json.dumps(
+                [
+                    {
+                        "path": "packages[0].net_weight",
+                        "value": 8,
+                        "unit": "KG",
+                        "reason": "Test rejection",
+                        "before": {"value": 9, "unit": "KG", "modified": False},
+                    }
+                ]
+            ),
+        )
+        db.session.add(rejected_proposal)
+        db.session.commit()
+        rejected_id = rejected_proposal.id
+
+    rejected = client.post(
+        f"/jobs/{job_id}/proposals/{rejected_id}/reject",
+        json={},
+    )
+    assert rejected.status_code == 200
+    assert rejected.get_json()["proposal"]["status"] == "rejected"
+
+    with app.app_context():
+        unchanged = Job.query.get(job_id)
+        current = PackingList.model_validate_json(unchanged.working_json)
+        assert current.packages[0].net_weight.working.value == 9
