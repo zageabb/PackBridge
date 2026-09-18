@@ -299,6 +299,8 @@ def process(job_id: int):
             profile_hint = (
                 f"Matched document profile: {profile_match.title}. "
                 f"Knowledge path: {profile_match.path}. "
+                f"Profile version: {profile_match.version or 'unversioned'}. "
+                f"Knowledge SHA-256: {profile_match.sha256}. "
                 f"Matched indicators: {', '.join(profile_match.matched_indicators)}"
             )
             job.document_profile = profile_match.title
@@ -311,6 +313,8 @@ def process(job_id: int):
                     "score": profile_match.score,
                     "total_indicators": profile_match.total_indicators,
                     "matched_indicators": profile_match.matched_indicators,
+                    "profile_version": profile_match.version,
+                    "knowledge_sha256": profile_match.sha256,
                 },
             )
 
