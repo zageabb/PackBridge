@@ -95,6 +95,8 @@ def to_packing_list(mapped: MapperResult) -> PackingList:
             position=field(mapped.order.position),
             project=field(mapped.order.project),
             customer_project=field(mapped.order.customer_project),
+            purchase_order=field(mapped.order.purchase_order),
+            purchase_order_position=field(mapped.order.purchase_order_position),
         ),
         shipment=ShipmentContext(
             product_type=field(mapped.shipment.product_type),
