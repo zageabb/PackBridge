@@ -71,6 +71,8 @@ class TemplateInspection:
     socs_headers: dict[str, str | None] = field(default_factory=dict)
     generated_pl_count: int = 0
     generated_ml_count: int = 0
+    existing_case_count: int = 0
+    generation_ready: bool = False
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -296,6 +298,17 @@ def inspect_template(path: str | Path) -> TemplateInspection:
                         inspection.errors.append(
                             f"SoCs_Temp {ref} is {actual!r}; expected {expected!r}."
                         )
+                case_refs = {f"S{row}" for row in range(23, 91)}
+                case_values = _sheet_cells(archive, socs_path, shared, case_refs)
+                inspection.existing_case_count = sum(
+                    value not in (None, "") for value in case_values.values()
+                )
+                if inspection.existing_case_count:
+                    inspection.warnings.append(
+                        f"Template contains {inspection.existing_case_count} existing SoCs case row(s); "
+                        "use a cleaned template before generation."
+                    )
+
                 inspection.validations = _validations(archive, socs_path)
                 present_ranges = {
                     part
@@ -310,6 +323,12 @@ def inspect_template(path: str | Path) -> TemplateInspection:
                     )
             elif "SoCs_Temp" in sheet_paths:
                 inspection.errors.append("SoCs_Temp worksheet XML is missing.")
+
+            if inspection.generated_pl_count or inspection.generated_ml_count:
+                inspection.warnings.append(
+                    "Template contains generated PL/ML sheets. A production generation template should contain only the "
+                    "controlled templates, or the generated sheets must be rebuilt before release."
+                )
 
             if not inspection.has_vba:
                 inspection.warnings.append(
@@ -335,6 +354,12 @@ def inspect_template(path: str | Path) -> TemplateInspection:
             }
             inspection.structural_fingerprint = _structure_fingerprint(structure)
             inspection.compatible = not inspection.errors
+            inspection.generation_ready = (
+                inspection.compatible
+                and inspection.existing_case_count == 0
+                and inspection.generated_pl_count == 0
+                and inspection.generated_ml_count == 0
+            )
     except (zipfile.BadZipFile, ET.ParseError, KeyError, OSError, ValueError) as exc:
         inspection.errors.append(f"Could not inspect SSD template: {exc}")
 
