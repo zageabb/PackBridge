@@ -1,0 +1,27 @@
+{
+  "name": "packbridge",
+  "display_name": "PackBridge",
+  "repo_path": "/home/zageabb/ollama-chat/PackBridge",
+  "branch": "main",
+  "enabled": true,
+  "auto_deploy": false,
+  "service_unit": "packbridge.service",
+  "environment_file": "/home/zageabb/.config/packbridge/packbridge.env",
+  "update_commands": [
+    [
+      "/home/zageabb/ollama-chat/PackBridge/.venv/bin/pip",
+      "install",
+      "-r",
+      "requirements.txt"
+    ]
+  ],
+  "restart_command": [
+    "systemctl",
+    "--user",
+    "restart",
+    "packbridge.service"
+  ],
+  "health_url": "http://127.0.0.1:5085/health",
+  "app_url": "http://127.0.0.1:5085/",
+  "show_on_home": true
+}
