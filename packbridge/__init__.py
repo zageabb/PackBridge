@@ -33,7 +33,8 @@ def create_app(config_object: type[Config] = Config) -> Flask:
     app.register_blueprint(projects_bp)
     app.register_blueprint(settings_bp)
 
-    with app.app_context():
-        db.create_all()
+    if app.config.get("AUTO_CREATE_DB", True):
+        with app.app_context():
+            db.create_all()
 
     return app
