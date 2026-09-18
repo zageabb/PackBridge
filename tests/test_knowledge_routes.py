@@ -82,3 +82,42 @@ def test_new_vendor_profile_is_inactive_until_approved(tmp_path):
     assert applied.status_code == 302
     assert target.exists()
     assert "Shipping Mass" in target.read_text(encoding="utf-8")
+
+
+
+def test_knowledge_download_and_import_create_reviewable_proposal(tmp_path):
+    app, root = make_app(tmp_path)
+    path = root / "vendors" / "acme"
+    path.mkdir(parents=True)
+    target = path / "packing-list.md"
+    target.write_text("# ACME Packing List\n\nOld mapping.\n", encoding="utf-8")
+
+    client = app.test_client()
+
+    download = client.get("/knowledge/download?path=vendors/acme/packing-list.md")
+    assert download.status_code == 200
+    assert b"Old mapping." in download.data
+
+    import io
+
+    imported = client.post(
+        "/knowledge/proposals/import",
+        data={
+            "target_path": "vendors/acme/packing-list.md",
+            "summary": "Remote support update",
+            "reason": "Updated after supplier example review",
+            "knowledge_file": (
+                io.BytesIO(b"# ACME Packing List\n\nUpdated mapping.\n"),
+                "packing-list.md",
+            ),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert imported.status_code == 302
+    assert "Old mapping." in target.read_text(encoding="utf-8")
+
+    with app.app_context():
+        proposal = KnowledgeProposalRecord.query.one()
+        assert proposal.status == "pending"
+        assert "Updated mapping." in proposal.proposed_content
