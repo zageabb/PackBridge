@@ -26,9 +26,9 @@ def _title(text: str, fallback: str) -> str:
 
 def _profile_version(text: str) -> str | None:
     for line in text.splitlines():
-        match = re.match(r"^s*Versions*:s*(.+?)s*$", line, flags=re.I)
-        if match:
-            value = match.group(1).strip()
+        stripped = line.strip()
+        if stripped.casefold().startswith("version:"):
+            value = stripped.split(":", 1)[1].strip()
             return value or None
     return None
 
@@ -54,10 +54,10 @@ def _section_lines(text: str, heading: str) -> list[str]:
 def _recognition_indicators(text: str) -> list[str]:
     values = []
     for line in _section_lines(text, "Typical recognition indicators"):
-        match = re.match(r"^s*[-*]s+(.+?)s*$", line)
-        if not match:
+        stripped = line.strip()
+        if not stripped.startswith(("- ", "* ")):
             continue
-        value = match.group(1).strip().strip(chr(96)).strip()
+        value = stripped[2:].strip().strip(chr(96)).strip()
         if value and len(value) <= 160:
             values.append(value)
     return values
