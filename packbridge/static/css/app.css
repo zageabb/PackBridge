@@ -618,3 +618,73 @@ body.resizing-assistant {
   0%, 100% { box-shadow: none; }
   15%, 70% { box-shadow: 0 0 0 3px rgba(49, 92, 141, .22); border-color: var(--accent-2); }
 }
+
+
+/* Controlled SSD template diagnostics */
+.template-settings-card {
+  margin-top: 22px;
+}
+.template-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, .8fr) minmax(0, 1.2fr);
+  gap: 26px;
+  align-items: start;
+}
+.template-diagnostics {
+  min-width: 0;
+}
+.diagnostic-list {
+  margin: 0;
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.diagnostic-list > div {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--line);
+}
+.diagnostic-list > div:last-child {
+  border-bottom: 0;
+}
+.diagnostic-list dt {
+  color: var(--muted);
+}
+.diagnostic-list dd {
+  margin: 0;
+  font-weight: 700;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.template-errors,
+.template-warnings {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+.template-errors > div,
+.template-warnings > div {
+  padding: 8px 10px;
+  border-radius: 7px;
+}
+.template-errors > div {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+.template-warnings > div {
+  color: var(--warning);
+  background: var(--warning-bg);
+}
+
+@media (max-width: 900px) {
+  .template-settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .diagnostic-list > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}
