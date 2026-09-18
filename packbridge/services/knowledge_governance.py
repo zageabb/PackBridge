@@ -30,6 +30,43 @@ def validate_knowledge_content(value: str) -> str:
     return text
 
 
+def _profile_version(text: str) -> int | None:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.casefold().startswith("version:"):
+            continue
+        raw = stripped.split(":", 1)[1].strip()
+        try:
+            return int(raw)
+        except ValueError:
+            return None
+    return None
+
+
+def _apply_profile_version(current: str, proposed: str, target_path: str) -> str:
+    if not str(target_path).replace("\\", "/").startswith("vendors/"):
+        return proposed
+
+    next_version = (_profile_version(current) or 0) + 1
+    lines = proposed.splitlines()
+    version_line = f"Version: {next_version}"
+
+    for index, line in enumerate(lines):
+        if line.strip().casefold().startswith("version:"):
+            lines[index] = version_line
+            return "\n".join(lines) + ("\n" if proposed.endswith("\n") else "")
+
+    heading_index = next(
+        (index for index, line in enumerate(lines) if line.startswith("# ")),
+        None,
+    )
+    if heading_index is None:
+        return proposed
+    lines.insert(heading_index + 1, "")
+    lines.insert(heading_index + 2, version_line)
+    return "\n".join(lines) + ("\n" if proposed.endswith("\n") else "")
+
+
 def sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
@@ -61,9 +98,14 @@ def proposal_diff(root: Path, proposal: KnowledgeProposalRecord) -> str:
         _, current, _ = current_content(root, proposal.target_path)
     except (OSError, KnowledgeGovernanceError):
         current = ""
+    proposed = _apply_profile_version(
+        current,
+        proposal.proposed_content,
+        proposal.target_path,
+    )
     diff = difflib.unified_diff(
         current.splitlines(),
-        proposal.proposed_content.splitlines(),
+        proposed.splitlines(),
         fromfile=proposal.target_path + " (current)",
         tofile=proposal.target_path + " (proposed)",
         lineterm="",
@@ -94,6 +136,8 @@ def apply_proposal(
         )
 
     proposed = validate_knowledge_content(proposal.proposed_content)
+    proposed = _apply_profile_version(current, proposed, proposal.target_path)
+    proposed = validate_knowledge_content(proposed)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
