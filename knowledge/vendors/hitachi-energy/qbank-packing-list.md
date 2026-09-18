@@ -72,6 +72,8 @@ Important rule:
 
 When a following page repeats the same Case Number and continues the line-item sequence, merge those items into the existing package.
 
+In the reference document used during development, 20 PDF pages represent 17 packages. Three packages continue onto a second page. This is a useful regression characteristic: the mapper must return 17 packages rather than 20.
+
 ## Line-item table
 
 Observed columns include:
