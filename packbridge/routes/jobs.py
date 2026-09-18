@@ -123,6 +123,17 @@ def _form_text(name: str) -> str | None:
     return value or None
 
 
+def _async_request() -> bool:
+    return request.headers.get("X-PackBridge-Async") == "1"
+
+
+def _process_error(job: Job, message: str, status_code: int = 409):
+    if _async_request():
+        return jsonify({"ok": False, "error": message, "status": job.status}), status_code
+    flash(message, "danger" if status_code >= 400 else "warning")
+    return redirect(url_for("jobs.view", job_id=job.id))
+
+
 @bp.post("/upload")
 def upload():
     upload_file = request.files.get("packing_list")
@@ -274,10 +285,10 @@ def process(job_id: int):
         and job.source_json != job.working_json
         and request.form.get("confirm_overwrite") != "1"
     ):
-        flash(
-            "This job contains working-data changes. Reprocessing is blocked until you explicitly discard them.",
-            "warning",
-        )
+        message = "This job contains working-data changes. Reprocessing is blocked until you explicitly discard them."
+        if _async_request():
+            return jsonify({"ok": False, "error": message, "status": job.status}), 409
+        flash(message, "warning")
         return redirect(url_for("jobs.view", job_id=job.id))
 
     chunks = (
@@ -287,8 +298,7 @@ def process(job_id: int):
         .all()
     )
     if not chunks:
-        flash("No extracted source text is available for this job.", "danger")
-        return redirect(url_for("jobs.view", job_id=job.id))
+        return _process_error(job, "No extracted source text is available for this job.", 409)
 
     document_text = "\n\n".join(f"[{chunk.locator}]\n{chunk.text}" for chunk in chunks)
     profile_hint = request.form.get("profile_hint", "").strip()
@@ -317,6 +327,13 @@ def process(job_id: int):
                     "knowledge_sha256": profile_match.sha256,
                 },
             )
+        else:
+            _audit(
+                job.id,
+                "profile_not_matched",
+                "No known vendor/document profile matched the source",
+                {"action": "generic_mapper", "learning_recommended": True},
+            )
 
     job.status = "processing"
     _audit(
@@ -327,8 +344,30 @@ def process(job_id: int):
     )
     db.session.commit()
 
+    def progress(stage: str, current: int, total: int) -> None:
+        labels = {
+            "mapping": (
+                f"Mapping document segment {current + 1} of {total}"
+                if current < total
+                else f"Mapped {total} document segment(s)"
+            ),
+            "merging": "Merging mapped cases and continuation sections",
+            "validating": "Running deterministic validation",
+        }
+        _audit(
+            job.id,
+            "mapping_progress",
+            labels.get(stage, stage.replace("_", " ").title()),
+            {"stage": stage, "current": current, "total": total},
+        )
+        db.session.commit()
+
     try:
-        packing = map_packing_list(document_text, profile_hint=profile_hint)
+        packing = map_packing_list(
+            document_text,
+            profile_hint=profile_hint,
+            progress_callback=progress,
+        )
         payload = packing.model_dump_json()
         job.source_json = payload
         job.working_json = payload
@@ -349,14 +388,65 @@ def process(job_id: int):
             },
         )
         db.session.commit()
-        flash(f"Local mapper returned {len(packing.packages)} package(s).", "success")
+        message = f"Local mapper returned {len(packing.packages)} package(s)."
+        if _async_request():
+            return jsonify(
+                {
+                    "ok": True,
+                    "message": message,
+                    "status": job.status,
+                    "redirect": url_for("jobs.view", job_id=job.id),
+                }
+            )
+        flash(message, "success")
     except MappingError as exc:
         job.status = "mapping_failed"
         job.error_message = str(exc)
         _audit(job.id, "mapping_failed", str(exc))
         db.session.commit()
+        if _async_request():
+            return jsonify({"ok": False, "error": str(exc), "status": job.status}), 422
         flash(str(exc), "danger")
     return redirect(url_for("jobs.view", job_id=job.id))
+
+
+@bp.get("/<int:job_id>/processing-status")
+def processing_status(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    events = (
+        AuditEvent.query.filter(
+            AuditEvent.job_id == job.id,
+            AuditEvent.event_type.in_(
+                [
+                    "profile_matched",
+                    "profile_not_matched",
+                    "mapping_started",
+                    "mapping_progress",
+                    "mapping_completed",
+                    "mapping_failed",
+                ]
+            ),
+        )
+        .order_by(AuditEvent.id.desc())
+        .limit(8)
+        .all()
+    )
+    return jsonify(
+        {
+            "job_id": job.id,
+            "status": job.status,
+            "error": job.error_message,
+            "events": [
+                {
+                    "type": event.event_type,
+                    "summary": event.summary,
+                    "payload": json.loads(event.payload_json) if event.payload_json else {},
+                    "created_at": event.created_at.isoformat(),
+                }
+                for event in reversed(events)
+            ],
+        }
+    )
 
 
 @bp.post("/<int:job_id>/field")
