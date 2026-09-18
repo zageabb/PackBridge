@@ -19,7 +19,7 @@
     </form>
 
     {% if query %}
-      <a class="knowledge-clear" href="{{ url_for('knowledge.index') }}">Clear search</a>
+      <a class="knowledge-clear" href="{{ url_for('knowledge.index', job=job_id or none) }}">Clear search</a>
     {% endif %}
 
     <div class="knowledge-documents">
