@@ -799,3 +799,28 @@ body.resizing-assistant {
     flex-direction: column;
   }
 }
+
+
+.case-override-panel {
+  border-color: #c7d8eb;
+}
+.case-override-panel > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.override-badge {
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: var(--accent-soft);
+  color: var(--accent-2);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.case-override-reset {
+  padding: 0 14px 14px;
+  display: flex;
+  justify-content: flex-end;
+}
