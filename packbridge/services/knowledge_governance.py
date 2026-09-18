@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from packbridge.models import KnowledgeProposalRecord
+from packbridge.services.knowledge_rules import KnowledgeRuleError, validate_structured_blocks
 
 
 class KnowledgeGovernanceError(ValueError):
@@ -27,6 +28,10 @@ def validate_knowledge_content(value: str) -> str:
         )
     if not any(line.startswith("# ") for line in text.splitlines()):
         raise KnowledgeGovernanceError("Knowledge documents must contain a top-level '# ' heading.")
+    try:
+        validate_structured_blocks(text)
+    except KnowledgeRuleError as exc:
+        raise KnowledgeGovernanceError(str(exc)) from exc
     return text
 
 
