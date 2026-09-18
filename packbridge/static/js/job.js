@@ -1,6 +1,7 @@
 (() => {
   const context = window.PACKBRIDGE_JOB;
-  if (!context) return;
+  const shell = document.getElementById("job-shell");
+  if (!context || !shell) return;
 
   const editor = document.getElementById("field-editor");
   const editorForm = document.getElementById("field-editor-form");
