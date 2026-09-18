@@ -10,6 +10,10 @@ from packbridge.extensions import db
 from packbridge.models import Job, SSDOutputRecord, SSDProject, SSDProjectJob
 from packbridge.ssd_schemas import SSDCaseContext, SSDContext, SSDHeaderContext
 from packbridge.services.aggregation import AggregationInput, build_project_preview
+from packbridge.services.validation_acknowledgements import (
+    active_acknowledgements,
+    apply_acknowledgements,
+)
 from packbridge.services.working_data import load_packing
 from packbridge.services.ssd_writer import SSDWriterError, write_socs_preview
 from packbridge.services.template_store import active_template
@@ -38,6 +42,10 @@ def _mapped_inputs(project: SSDProject) -> list[AggregationInput]:
             continue
         try:
             packing = load_packing(link.job.working_json)
+            apply_acknowledgements(
+                packing,
+                active_acknowledgements(link.job.id),
+            )
         except ValueError:
             continue
         inputs.append(
