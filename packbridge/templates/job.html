@@ -47,6 +47,8 @@
     data-source-unit="{{ field.source.unit if field and field.source and field.source.unit else '' }}"
     data-locator="{{ field.source.evidence[0].locator if field and field.source and field.source.evidence else '' }}"
     data-raw="{{ field.source.raw if field and field.source and field.source.raw else '' }}"
+    data-modified="{{ '1' if field and field.modified else '0' }}"
+    data-reason="{{ field.working.reason if field and field.working and field.working.reason else '' }}"
     title="Edit {{ label }}"
   >✎</button>
 </div>
@@ -67,6 +69,8 @@
     data-source-unit="{{ field.source.unit if field and field.source and field.source.unit else '' }}"
     data-locator="{{ field.source.evidence[0].locator if field and field.source and field.source.evidence else '' }}"
     data-raw="{{ field.source.raw if field and field.source and field.source.raw else '' }}"
+    data-modified="{{ '1' if field and field.modified else '0' }}"
+    data-reason="{{ field.working.reason if field and field.working and field.working.reason else '' }}"
     title="Edit value"
   >✎</button>
 </div>
@@ -688,7 +692,10 @@
     </div>
     <div class="field-editor-error" id="field-editor-error" hidden></div>
     <div class="field-editor-actions">
-      <button type="button" class="btn btn-secondary" id="field-editor-revert">Revert to source</button>
+      <div class="field-editor-secondary-actions">
+        <button type="button" class="btn btn-secondary" id="field-editor-revert">Revert to source</button>
+        <button type="button" class="btn btn-secondary" id="field-editor-learn" hidden>Propose profile learning</button>
+      </div>
       <div>
         <button type="button" class="btn btn-secondary" data-close-editor>Cancel</button>
         <button type="submit" class="btn btn-primary">Save working value</button>
@@ -721,7 +728,8 @@
 window.PACKBRIDGE_JOB = {
   id: {{ job.id }},
   selectedCase: {{ (selected_package.case_number.working.value if selected_package and selected_package.case_number.working else none)|tojson }},
-  selectedPackageIndex: {{ selected_package_index|tojson }}
+  selectedPackageIndex: {{ selected_package_index|tojson }},
+  profileKnowledgePath: {{ profile_knowledge_path|tojson }}
 };
 </script>
 <script src="{{ url_for('static', filename='js/job.js') }}"></script>
