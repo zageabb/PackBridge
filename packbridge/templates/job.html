@@ -117,6 +117,7 @@
           <span class="tab-more">+{{ packages|length - 12 }}</span>
         {% endif %}
         <a href="#issues">Issues <span class="tab-count">{{ issue_counts.BLOCKING + issue_counts.WARNING }}</span></a>
+        <a href="#output-preview">Output Preview</a>
         <a href="#source">Source</a>
         <a href="#audit">Audit</a>
       </div>
@@ -274,6 +275,147 @@
           </div>
         {% else %}
           <div class="empty-state compact-empty"><strong>No current validation issues.</strong></div>
+        {% endif %}
+      </section>
+
+      <section class="card output-preview-card" id="output-preview">
+        <div class="section-heading">
+          <div>
+            <h2>SSD Output Preview</h2>
+            <p>Read-only proposed SoCs_Temp values. The workbook writer is still disabled.</p>
+          </div>
+          {% if ssd_preview %}
+            <div class="issue-chips">
+              {% if ssd_preview.blocking %}<span class="issue-chip blocking">{{ ssd_preview.blocking|length }} blocking</span>{% endif %}
+              {% if ssd_preview.warnings %}<span class="issue-chip warning">{{ ssd_preview.warnings|length }} warning</span>{% endif %}
+              {% if not ssd_preview.blocking and not ssd_preview.warnings %}<span class="issue-chip clear">Preview ready</span>{% endif %}
+            </div>
+          {% endif %}
+        </div>
+
+        <details class="ssd-context-panel" {% if not ssd_preview or ssd_preview.warnings %}open{% endif %}>
+          <summary>SSD project/default values</summary>
+          <form method="post" action="{{ url_for('jobs.update_ssd_context', job_id=job.id) }}" class="ssd-context-form">
+            <fieldset>
+              <legend>Project / header</legend>
+              <label><span>Project Name</span><input name="header_project_name" value="{{ ssd_context.header.project_name or '' }}"></label>
+              <label><span>Delivery Location</span><input name="header_delivery_location" value="{{ ssd_context.header.delivery_location or '' }}"></label>
+              <label><span>Supplier Name</span><input name="header_supplier_name" value="{{ ssd_context.header.supplier_name or '' }}"></label>
+              <label><span>Currency</span><input name="header_currency" value="{{ ssd_context.header.currency or '' }}"></label>
+              <label><span>BU Details</span><input name="header_bu_details" value="{{ ssd_context.header.bu_details or '' }}"></label>
+              <label><span>Preliminary / Final</span>
+                <select name="header_preliminary_final">
+                  <option value=""></option>
+                  <option value="P" {% if ssd_context.header.preliminary_final == 'P' %}selected{% endif %}>P — Preliminary</option>
+                  <option value="F" {% if ssd_context.header.preliminary_final == 'F' %}selected{% endif %}>F — Final</option>
+                </select>
+              </label>
+              <label><span>Pick-up Address</span><input name="header_pickup_address" value="{{ ssd_context.header.pickup_address or '' }}"></label>
+              <label><span>Supplier Contact</span><input name="header_supplier_contact" value="{{ ssd_context.header.supplier_contact or '' }}"></label>
+              <label><span>Contact Person &amp; Number</span><input name="header_contact_person_number" value="{{ ssd_context.header.contact_person_number or '' }}"></label>
+              <label><span>Supplier Reference</span><input name="header_supplier_reference" value="{{ ssd_context.header.supplier_reference or '' }}"></label>
+              <label class="wide"><span>Other Remarks</span><input name="header_other_remarks" value="{{ ssd_context.header.other_remarks or '' }}"></label>
+            </fieldset>
+
+            <fieldset>
+              <legend>Default package values</legend>
+              <label><span>Content Description</span><input name="default_content_description" value="{{ ssd_context.defaults.content_description or '' }}" placeholder="e.g. QBANK"></label>
+              <label><span>EQ Group</span><input name="default_equipment_group" value="{{ ssd_context.defaults.equipment_group or '' }}" placeholder="e.g. 011"></label>
+              <label><span>HE PO Number</span><input name="default_purchase_order" value="{{ ssd_context.defaults.purchase_order or '' }}"></label>
+              <label><span>PO Position</span><input name="default_purchase_order_position" value="{{ ssd_context.defaults.purchase_order_position or '' }}"></label>
+              <label><span>Declare As</span>
+                <select name="default_declare_as">
+                  <option value=""></option>
+                  {% for value in ['System', 'Loose Parts'] %}
+                    <option value="{{ value }}" {% if ssd_context.defaults.declare_as == value %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label><span>Storage Requirement</span>
+                <select name="default_storage_requirement">
+                  <option value=""></option>
+                  {% for value in ['Outdoor', 'Outdoor covered', 'Indoor', 'Indoor heated'] %}
+                    <option value="{{ value }}" {% if ssd_context.defaults.storage_requirement == value %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label><span>Packaging Material</span>
+                <select name="default_packaging_material">
+                  <option value=""></option>
+                  {% for value in ['PALLET','CARTON_BOX','WOODEN_FRAME','BUNDLE','WOODEN_BOX','DRUM','UNPACKED'] %}
+                    <option value="{{ value }}" {% if ssd_context.defaults.packaging_material == value %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label><span>Stackability</span>
+                <select name="default_stackability">
+                  <option value=""></option>
+                  {% for value in ['Stackable 1 tier','Stackable 2 tier','Stackable 3 tier','Not stackable'] %}
+                    <option value="{{ value }}" {% if ssd_context.defaults.stackability == value %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label><span>Dangerous Goods</span>
+                <select name="default_dangerous_goods">
+                  <option value=""></option>
+                  <option value="N" {% if ssd_context.defaults.dangerous_goods == 'N' %}selected{% endif %}>N</option>
+                  <option value="Y" {% if ssd_context.defaults.dangerous_goods == 'Y' %}selected{% endif %}>Y</option>
+                </select>
+              </label>
+              <label><span>Border Crossing Value</span><input name="default_border_crossing_value" value="{{ ssd_context.defaults.border_crossing_value if ssd_context.defaults.border_crossing_value is not none else '' }}"></label>
+              <label><span>Pickup Week Planned</span><input name="default_pickup_week_planned" value="{{ ssd_context.defaults.pickup_week_planned or '' }}"></label>
+              <label><span>Pickup Week Actual</span><input name="default_pickup_week_actual" value="{{ ssd_context.defaults.pickup_week_actual or '' }}"></label>
+              <label><span>Item Designation</span><input name="default_item_designation" value="{{ ssd_context.defaults.item_designation or '' }}"></label>
+              <label class="wide"><span>Remarks</span><input name="default_remarks" value="{{ ssd_context.defaults.remarks or '' }}"></label>
+            </fieldset>
+
+            <div class="ssd-context-actions">
+              <span>These values are SSD/project context, not invented packing-list source data.</span>
+              <button class="btn btn-primary" type="submit">Save SSD context</button>
+            </div>
+          </form>
+        </details>
+
+        {% if ssd_preview %}
+          {% if ssd_preview.blocking or ssd_preview.warnings %}
+          <div class="preview-messages">
+            {% for message in ssd_preview.blocking %}<div class="preview-message blocking">{{ message }}</div>{% endfor %}
+            {% for message in ssd_preview.warnings %}<div class="preview-message warning">{{ message }}</div>{% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="table-wrap preview-table-wrap">
+            <table class="data-table compact preview-table">
+              <thead>
+                <tr>
+                  <th>Excel row</th><th>C Qty</th><th>D Content</th><th>E EQ</th><th>G Declare</th><th>H PO</th><th>I Pos</th>
+                  <th>J L</th><th>K W</th><th>L H</th><th>M Vol</th><th>N Net</th><th>O Gross</th>
+                  <th>R Storage</th><th>S Case</th><th>T Packaging</th><th>U Stack</th><th>V DG</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in ssd_preview.rows %}
+                <tr class="{% if row.missing_context or row.issues %}preview-row-warning{% endif %}">
+                  <td>{{ row.excel_row or '—' }}</td>
+                  {% for column in ['C','D','E','G','H','I','J','K','L','M','N','O','R','S','T','U','V'] %}
+                  <td title="{{ row.origins.get(column, '') }}">{{ row.columns.get(column) if row.columns.get(column) is not none else '—' }}</td>
+                  {% endfor %}
+                </tr>
+                {% if row.issues or row.missing_context %}
+                <tr class="preview-detail-row">
+                  <td colspan="18">
+                    {% if row.missing_context %}<strong>Needs context:</strong> {{ row.missing_context|join(', ') }}{% endif %}
+                    {% if row.issues %}<span>{% if row.missing_context %} • {% endif %}{{ row.issues|join(' • ') }}</span>{% endif %}
+                  </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="muted preview-note">Volume is shown as the deterministic preview calculation. The actual writer will preserve the workbook's existing M-column formula.</p>
+        {% else %}
+          <div class="empty-state compact-empty">Map the source document before an SSD preview can be built.</div>
         {% endif %}
       </section>
 
