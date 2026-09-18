@@ -6,7 +6,7 @@
   <div>
     <div class="eyebrow">KNOWLEDGE</div>
     <h1>Mapping guidance</h1>
-    <p>Human-readable system and vendor/document-profile guidance used by the local mapper.</p>
+    <p>Human-readable system and vendor/document-profile guidance used by the local mapper. Changes are proposed first and only become active after approval.</p>
   </div>
 </section>
 
@@ -16,9 +16,11 @@
       <input type="search" name="q" value="{{ query }}" placeholder="Search Knowledge">
       <button class="btn btn-secondary" type="submit">Search</button>
     </form>
+
     {% if query %}
       <a class="knowledge-clear" href="{{ url_for('knowledge.index') }}">Clear search</a>
     {% endif %}
+
     <div class="knowledge-documents">
       {% for document in documents %}
       <a
@@ -33,22 +35,133 @@
       <div class="empty-state compact-empty">No Knowledge documents matched.</div>
       {% endfor %}
     </div>
+
+    <details class="knowledge-new-profile">
+      <summary>Propose new document profile</summary>
+      <form method="post" action="{{ url_for('knowledge.propose_new') }}" class="knowledge-proposal-form">
+        <label>
+          <span>Knowledge path</span>
+          <input name="target_path" placeholder="vendors/vendor-name/packing-list.md" required>
+        </label>
+        <label>
+          <span>Summary</span>
+          <input name="summary" placeholder="Add Vendor ABC packing-list profile">
+        </label>
+        <label>
+          <span>Reason</span>
+          <textarea name="reason" rows="2" placeholder="Why this profile is needed"></textarea>
+        </label>
+        <label>
+          <span>Document content</span>
+          <textarea name="proposed_content" rows="14" required placeholder="# Vendor ABC — Packing List Profile
+
+## Recognition indicators
+
+...
+
+## Field Mapping
+
+..."></textarea>
+        </label>
+        <button class="btn btn-primary" type="submit">Create proposal</button>
+      </form>
+    </details>
   </aside>
 
-  <section class="card knowledge-viewer">
-    {% if selected %}
+  <div class="knowledge-main">
+    <section class="card knowledge-viewer">
+      {% if selected %}
+        <div class="section-heading">
+          <div>
+            <h2>{{ selected.path }}</h2>
+            <p>This file is active Knowledge. Editing creates a reviewable proposal rather than changing it immediately.</p>
+          </div>
+        </div>
+
+        <pre>{{ selected.content }}</pre>
+
+        <details class="knowledge-edit-panel">
+          <summary>Propose an update to this Knowledge document</summary>
+          <form method="post" action="{{ url_for('knowledge.propose_edit') }}" class="knowledge-proposal-form">
+            <input type="hidden" name="target_path" value="{{ selected.path }}">
+            <label>
+              <span>Summary</span>
+              <input name="summary" placeholder="Describe the mapping/profile change">
+            </label>
+            <label>
+              <span>Reason / evidence</span>
+              <textarea name="reason" rows="2" placeholder="For example: confirmed against a new supplier packing list"></textarea>
+            </label>
+            <label>
+              <span>Proposed content</span>
+              <textarea name="proposed_content" rows="24" required>{{ selected.content }}</textarea>
+            </label>
+            <div class="knowledge-proposal-actions">
+              <span>The active file is unchanged until a separate Approve action.</span>
+              <button class="btn btn-primary" type="submit">Propose change</button>
+            </div>
+          </form>
+        </details>
+      {% else %}
+        <div class="empty-state">
+          <strong>No Knowledge document selected.</strong>
+        </div>
+      {% endif %}
+    </section>
+
+    <section class="card knowledge-proposals">
       <div class="section-heading">
         <div>
-          <h2>{{ selected.path }}</h2>
-          <p>Read-only in the current development slice. Knowledge approval/editing comes later.</p>
+          <h2>Knowledge proposals</h2>
+          <p>Pending changes must be reviewed independently before they become mapper guidance.</p>
         </div>
       </div>
-      <pre>{{ selected.content }}</pre>
-    {% else %}
-      <div class="empty-state">
-        <strong>No Knowledge document selected.</strong>
-      </div>
-    {% endif %}
-  </section>
+
+      {% if proposals %}
+        <div class="knowledge-proposal-list">
+        {% for item in proposals %}
+          {% set proposal = item.record %}
+          <article class="knowledge-proposal-card status-{{ proposal.status }}">
+            <div class="knowledge-proposal-heading">
+              <div>
+                <strong>{{ proposal.summary }}</strong>
+                <span>{{ proposal.target_path }}</span>
+              </div>
+              <span class="status status-{{ proposal.status }}">{{ proposal.status }}</span>
+            </div>
+
+            {% if proposal.reason %}
+              <p class="knowledge-proposal-reason">{{ proposal.reason }}</p>
+            {% endif %}
+
+            <details {% if proposal.status == 'pending' %}open{% endif %}>
+              <summary>Review diff</summary>
+              <pre class="knowledge-diff">{{ item.diff or 'No textual diff available.' }}</pre>
+            </details>
+
+            <div class="knowledge-proposal-meta">
+              <span>Created {{ proposal.created_at.strftime("%d %b %Y %H:%M") }}</span>
+              {% if proposal.job_id %}<span>Job {{ proposal.job_id }}</span>{% endif %}
+              {% if proposal.decided_by %}<span>Decision: {{ proposal.decided_by }}</span>{% endif %}
+            </div>
+
+            {% if proposal.status == 'pending' %}
+            <div class="knowledge-proposal-buttons">
+              <form method="post" action="{{ url_for('knowledge.reject', proposal_id=proposal.id) }}">
+                <button class="btn btn-secondary" type="submit">Reject</button>
+              </form>
+              <form method="post" action="{{ url_for('knowledge.apply', proposal_id=proposal.id) }}">
+                <button class="btn btn-primary" type="submit">Approve &amp; activate</button>
+              </form>
+            </div>
+            {% endif %}
+          </article>
+        {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state compact-empty">No Knowledge proposals yet.</div>
+      {% endif %}
+    </section>
+  </div>
 </div>
 {% endblock %}
