@@ -5,8 +5,8 @@
 <section class="page-heading">
   <div>
     <div class="eyebrow">SETTINGS</div>
-    <h1>Local AI</h1>
-    <p>PackBridge uses Ollama for document mapping and the contextual assistant.</p>
+    <h1>Local AI &amp; SSD template</h1>
+    <p>PackBridge uses local Ollama for mapping and a separately controlled workbook template for deterministic SSD output.</p>
   </div>
 </section>
 
@@ -63,4 +63,64 @@
     {% endif %}
   </section>
 </div>
+
+<section class="card template-settings-card">
+  <div class="section-heading">
+    <div>
+      <h2>Controlled SSD template</h2>
+      <p>Templates are versioned by SHA-256 and accepted only when the expected SoCs / Packing List / Marking Label structure is present.</p>
+    </div>
+    {% if template and template.available and template.inspection.compatible %}
+      <span class="status status-mapped">Verified</span>
+    {% else %}
+      <span class="status status-failed">Not installed</span>
+    {% endif %}
+  </div>
+
+  <div class="template-settings-grid">
+    <form method="post" action="{{ url_for('settings.template_upload') }}" enctype="multipart/form-data" class="form-stack">
+      <label>
+        <span>Install template (XLSM or XLSX)</span>
+        <input type="file" name="ssd_template" accept=".xlsm,.xlsx" required>
+      </label>
+      <p class="muted">Installing a new template changes only the active controlled template pointer. Previous versioned files remain on disk.</p>
+      <div>
+        <button class="btn btn-primary" type="submit">Inspect &amp; install template</button>
+      </div>
+    </form>
+
+    <div class="template-diagnostics">
+      {% if template and template.available %}
+        {% set inspection = template.inspection %}
+        <dl class="diagnostic-list">
+          <div><dt>Original file</dt><dd>{{ template.original_name }}</dd></div>
+          <div><dt>Stored version</dt><dd>{{ template.filename }}</dd></div>
+          <div><dt>Workbook type</dt><dd>{{ inspection.workbook_type|upper }}</dd></div>
+          <div><dt>VBA project</dt><dd>{{ "Present" if inspection.has_vba else "Not present" }}</dd></div>
+          <div><dt>Worksheets</dt><dd>{{ inspection.sheet_count }}</dd></div>
+          <div><dt>Generated PL / ML</dt><dd>{{ inspection.generated_pl_count }} / {{ inspection.generated_ml_count }}</dd></div>
+          <div><dt>Structure fingerprint</dt><dd><code>{{ inspection.structural_fingerprint[:16] }}…</code></dd></div>
+          <div><dt>File SHA-256</dt><dd><code>{{ inspection.sha256[:16] }}…</code></dd></div>
+        </dl>
+        {% if inspection.errors %}
+          <div class="template-errors">
+            {% for error in inspection.errors %}<div>{{ error }}</div>{% endfor %}
+          </div>
+        {% endif %}
+        {% if inspection.warnings %}
+          <div class="template-warnings">
+            {% for warning in inspection.warnings %}<div>{{ warning }}</div>{% endfor %}
+          </div>
+        {% endif %}
+      {% elif template and template.error %}
+        <div class="issue-banner"><strong>Template issue</strong><span>{{ template.error }}</span></div>
+      {% else %}
+        <div class="empty-state compact-empty">
+          <strong>No active SSD template.</strong>
+          <span>Install the controlled workbook before output-generation development is enabled.</span>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
 {% endblock %}
