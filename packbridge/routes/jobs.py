@@ -15,7 +15,7 @@ from flask import (
 )
 
 from packbridge.extensions import db
-from packbridge.models import AuditEvent, ChatMessage, Job, SourceChunk, SourceDocument
+from packbridge.models import AuditEvent, ChatMessage, Job, SSDContextRecord, SourceChunk, SourceDocument
 from packbridge.services.document_ingestion import (
     ALLOWED_EXTENSIONS,
     DocumentIngestionError,
@@ -26,6 +26,8 @@ from packbridge.services.prompt_service import load_prompt
 from packbridge.services.profile_matching import match_profile
 from packbridge.services.runtime_settings import client as ollama_client
 from packbridge.services.storage import save_job_upload
+from packbridge.services.ssd_preview import build_ssd_preview
+from packbridge.ssd_schemas import SSDContext
 from packbridge.services.working_data import (
     WorkingDataError,
     dump_packing,
@@ -83,6 +85,21 @@ def _selected_package(packages: list[dict], selected_case: str | None):
         if selected_case is not None and str(value) == selected_case:
             return package, index
     return packages[0], 0
+
+
+def _ssd_context(job: Job) -> SSDContext:
+    record = SSDContextRecord.query.filter_by(job_id=job.id).first()
+    if not record or not record.context_json:
+        return SSDContext()
+    try:
+        return SSDContext.model_validate_json(record.context_json)
+    except ValueError:
+        return SSDContext()
+
+
+def _form_text(name: str) -> str | None:
+    value = str(request.form.get(name) or "").strip()
+    return value or None
 
 
 @bp.post("/upload")
@@ -166,9 +183,13 @@ def view(job_id: int):
     packages = (packing or {}).get("packages", [])
     selected, selected_index = _selected_package(packages, request.args.get("case"))
     counts = {"INFO": 0, "WARNING": 0, "BLOCKING": 0}
+    ssd_context = _ssd_context(job)
+    ssd_preview = None
     if job.working_json:
         try:
-            counts = issue_counts(load_packing(job.working_json))
+            working_model = load_packing(job.working_json)
+            counts = issue_counts(working_model)
+            ssd_preview = build_ssd_preview(working_model, ssd_context)
         except (ValueError, TypeError):
             pass
     audit_events = (
@@ -186,6 +207,8 @@ def view(job_id: int):
         selected_package_index=selected_index,
         issue_counts=counts,
         audit_events=audit_events,
+        ssd_context=ssd_context,
+        ssd_preview=ssd_preview,
     )
 
 
@@ -415,6 +438,90 @@ def revert_working_job(job_id: int):
             "status": job.status,
         }
     )
+
+
+@bp.post("/<int:job_id>/ssd-context")
+def update_ssd_context(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    context = _ssd_context(job)
+
+    header_fields = (
+        "currency",
+        "supplier_name",
+        "pickup_address",
+        "supplier_contact",
+        "preliminary_final",
+        "bu_details",
+        "project_name",
+        "delivery_location",
+        "contact_person_number",
+        "other_remarks",
+        "supplier_reference",
+    )
+    default_fields = (
+        "content_description",
+        "equipment_group",
+        "declare_as",
+        "purchase_order",
+        "purchase_order_position",
+        "pickup_week_planned",
+        "pickup_week_actual",
+        "storage_requirement",
+        "packaging_material",
+        "stackability",
+        "dangerous_goods",
+        "item_designation",
+        "remarks",
+    )
+
+    header_values = context.header.model_dump()
+    for name in header_fields:
+        header_values[name] = _form_text("header_" + name)
+
+    default_values = context.defaults.model_dump()
+    for name in default_fields:
+        default_values[name] = _form_text("default_" + name)
+
+    border_value = _form_text("default_border_crossing_value")
+    if border_value is None:
+        default_values["border_crossing_value"] = None
+    else:
+        try:
+            default_values["border_crossing_value"] = float(border_value.replace(",", ""))
+        except ValueError:
+            flash("Border Crossing Value must be numeric.", "danger")
+            return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
+
+    updated = SSDContext.model_validate(
+        {
+            "header": header_values,
+            "defaults": default_values,
+            "case_overrides": {
+                key: value.model_dump()
+                for key, value in context.case_overrides.items()
+            },
+        }
+    )
+
+    record = SSDContextRecord.query.filter_by(job_id=job.id).first()
+    if record is None:
+        record = SSDContextRecord(job_id=job.id)
+        db.session.add(record)
+    record.context_json = updated.model_dump_json()
+    record.updated_by = "user"
+    _audit(
+        job.id,
+        "ssd_context_updated",
+        "Updated SSD project/default context",
+        {
+            "header_fields": [name for name, value in header_values.items() if value not in (None, "")],
+            "default_fields": [name for name, value in default_values.items() if value not in (None, "")],
+        },
+        actor="user",
+    )
+    db.session.commit()
+    flash("SSD project/default context saved.", "success")
+    return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
 
 
 @bp.post("/<int:job_id>/chat")
