@@ -33,6 +33,7 @@ from packbridge.services.document_ingestion import (
     DocumentIngestionError,
     extract_path,
 )
+from packbridge.services.knowledge import find_by_title
 from packbridge.services.mapper import MappingError, map_packing_list
 from packbridge.services.prompt_service import load_prompt
 from packbridge.services.profile_matching import match_profile
@@ -230,6 +231,17 @@ def view(job_id: int):
         .limit(30)
         .all()
     )
+    profile_knowledge_path = None
+    if job.document_profile:
+        profile_document = find_by_title(
+            Path(current_app.config["KNOWLEDGE_ROOT"]),
+            job.document_profile,
+        )
+        if profile_document is not None:
+            profile_knowledge_path = str(
+                profile_document.relative_to(Path(current_app.config["KNOWLEDGE_ROOT"]).resolve())
+            )
+
     return render_template(
         "job.html",
         job=job,
@@ -242,6 +254,7 @@ def view(job_id: int):
         audit_events=audit_events,
         ssd_context=ssd_context,
         ssd_preview=ssd_preview,
+        profile_knowledge_path=profile_knowledge_path,
         selected_ssd_override=(
             ssd_context.case_overrides.get(
                 str((((selected or {}).get("case_number") or {}).get("working") or {}).get("value") or "")
