@@ -51,7 +51,7 @@
 </div>
 {% endmacro %}
 
-{% macro editable_cell(field, path) %}
+{% macro editable_cell(field, path, label) %}
 <div class="editable-cell {% if field and field.modified %}field-modified{% endif %}">
   <span>{{ value_of(field) }}</span>
   <button
@@ -59,7 +59,7 @@
     class="cell-edit-btn"
     data-field-edit
     data-path="{{ path }}"
-    data-label="{{ path.rsplit('.', 1)[-1]|replace('_', ' ')|title }}"
+    data-label="{{ label }}"
     data-current="{{ field.working.value if field and field.working and field.working.value is not none else '' }}"
     data-unit="{{ field.working.unit if field and field.working and field.working.unit else '' }}"
     data-source="{{ field.source.value if field and field.source and field.source.value is not none else '' }}"
@@ -224,13 +224,13 @@
                 {% for item in selected_package.items %}
                 {% set item_index = loop.index0 %}
                 <tr>
-                  <td>{{ editable_cell(item.sequence, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].sequence") }}</td>
-                  <td>{{ editable_cell(item.position, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].position") }}</td>
-                  <td>{{ editable_cell(item.item_number, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].item_number") }}</td>
-                  <td>{{ editable_cell(item.description, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].description") }}</td>
-                  <td>{{ editable_cell(item.serial_number, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].serial_number") }}</td>
-                  <td>{{ editable_cell(item.quantity, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].quantity") }}</td>
-                  <td>{{ editable_cell(item.uom, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].uom") }}</td>
+                  <td>{{ editable_cell(item.sequence, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].sequence", "Sequence") }}</td>
+                  <td>{{ editable_cell(item.position, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].position", "Position") }}</td>
+                  <td>{{ editable_cell(item.item_number, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].item_number", "Item Number") }}</td>
+                  <td>{{ editable_cell(item.description, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].description", "Description") }}</td>
+                  <td>{{ editable_cell(item.serial_number, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].serial_number", "Serial Number") }}</td>
+                  <td>{{ editable_cell(item.quantity, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].quantity", "Quantity") }}</td>
+                  <td>{{ editable_cell(item.uom, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].uom", "UOM") }}</td>
                 </tr>
                 {% else %}
                 <tr><td colspan="7" class="muted-cell">No line items mapped for this case.</td></tr>
