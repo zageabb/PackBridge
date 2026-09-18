@@ -54,6 +54,8 @@ class SoCsPreviewRow(BaseModel):
     package_index: int
     case_number: str | None = None
     excel_row: int | None = None
+    source_job_id: int | None = None
+    source_job_title: str | None = None
     columns: dict[str, Any] = Field(default_factory=dict)
     origins: dict[str, str] = Field(default_factory=dict)
     missing_context: list[str] = Field(default_factory=list)
