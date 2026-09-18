@@ -76,11 +76,36 @@
         <div class="section-heading">
           <div>
             <h2>{{ selected.path }}</h2>
-            <p>This file is active Knowledge. Editing creates a reviewable proposal rather than changing it immediately.</p>
+            <p>This file is active Knowledge. Editing or importing an update creates a reviewable proposal rather than changing it immediately.</p>
           </div>
+          <a class="btn btn-secondary" href="{{ url_for('knowledge.download', path=selected.path) }}">Download Markdown</a>
         </div>
 
         <pre>{{ selected.content }}</pre>
+
+        <details class="knowledge-import-panel">
+          <summary>Import an updated copy as a proposal</summary>
+          <form method="post" action="{{ url_for('knowledge.propose_import') }}" enctype="multipart/form-data" class="knowledge-proposal-form">
+            <input type="hidden" name="target_path" value="{{ selected.path }}">
+            {% if job_id %}<input type="hidden" name="job_id" value="{{ job_id }}">{% endif %}
+            <label>
+              <span>Updated Markdown file</span>
+              <input type="file" name="knowledge_file" accept=".md,text/markdown,text/plain" required>
+            </label>
+            <label>
+              <span>Summary</span>
+              <input name="summary" placeholder="Import remotely updated profile">
+            </label>
+            <label>
+              <span>Reason / support note</span>
+              <textarea name="reason" rows="2" placeholder="For example: updated remotely after reviewing a failing supplier document"></textarea>
+            </label>
+            <div class="knowledge-proposal-actions">
+              <span>The imported file is compared with the active document before it can be approved.</span>
+              <button class="btn btn-primary" type="submit">Import as proposal</button>
+            </div>
+          </form>
+        </details>
 
         <details class="knowledge-edit-panel">
           <summary>Propose an update to this Knowledge document</summary>
