@@ -1,0 +1,16 @@
+[Unit]
+Description=PackBridge Local Packing List to SSD Workspace
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/ollama-chat/PackBridge
+Environment=PATH=%h/ollama-chat/PackBridge/.venv/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-%h/.config/packbridge/packbridge.env
+ExecStart=%h/ollama-chat/PackBridge/.venv/bin/gunicorn --bind 0.0.0.0:5085 --workers 2 --timeout 600 wsgi:application
+Restart=on-failure
+RestartSec=3
+KillMode=control-group
+
+[Install]
+WantedBy=default.target
