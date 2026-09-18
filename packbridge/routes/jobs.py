@@ -18,6 +18,7 @@ from flask import (
 from packbridge.assistant_schemas import AssistantStructuredReply
 from packbridge.extensions import db
 from packbridge.models import AssistantProposalRecord, AuditEvent, ChatMessage, Job, SSDContextRecord, SourceChunk, SourceDocument
+from packbridge.services.assistant_context import build_assistant_context
 from packbridge.services.document_ingestion import (
     ALLOWED_EXTENSIONS,
     DocumentIngestionError,
@@ -29,6 +30,7 @@ from packbridge.services.profile_matching import match_profile
 from packbridge.services.runtime_settings import client as ollama_client
 from packbridge.services.storage import save_job_upload
 from packbridge.services.ssd_preview import build_ssd_preview
+from packbridge.services.source_evidence import find_source_evidence
 from packbridge.ssd_schemas import SSDCaseContext, SSDContext
 from packbridge.services.working_data import (
     WorkingDataError,
@@ -744,19 +746,20 @@ def chat(job_id: int):
     )
     history = [{"role": row.role, "content": row.content} for row in reversed(recent)]
 
-    job_context = {
-        "job_id": job.id,
-        "status": job.status,
-        "vendor": job.vendor,
-        "document_profile": job.document_profile,
-        "sales_order": job.sales_order,
-        "selected_context": context,
-        "working_data": _working(job),
-    }
+    packing_model = None
+    if job.working_json:
+        try:
+            packing_model = load_packing(job.working_json)
+        except ValueError:
+            packing_model = None
+
+    selected_case = str(context.get("selected_case") or "").strip() or None
+    job_context = build_assistant_context(job, packing_model, selected_case)
+    job_context["selected_context"] = context
     system_prompt = (
         load_prompt("job_assistant")
-        + "\n\nCURRENT JOB CONTEXT:\n"
-        + json.dumps(job_context, default=str)[:45_000]
+        + "\n\nCURRENT GROUNDED JOB CONTEXT:\n"
+        + json.dumps(job_context, default=str)[:32_000]
     )
 
     client = ollama_client()
@@ -898,6 +901,26 @@ def reject_assistant_proposal(job_id: int, proposal_id: int):
     )
     db.session.commit()
     return jsonify({"ok": True, "proposal": _proposal_dict(proposal)})
+
+
+@bp.get("/<int:job_id>/source-evidence")
+def source_evidence(job_id: int):
+    Job.query.get_or_404(job_id)
+    locator = str(request.args.get("locator") or "").strip()
+    if not locator:
+        return jsonify({"error": "A source locator is required."}), 400
+
+    matches = find_source_evidence(job_id, locator, limit=5)
+    if not matches:
+        return jsonify(
+            {
+                "locator": locator,
+                "matches": [],
+                "message": "No retained source section matched this locator.",
+            }
+        ), 404
+
+    return jsonify({"locator": locator, "matches": matches})
 
 
 @bp.get("/<int:job_id>/chat/history")
