@@ -33,3 +33,20 @@ The application requires a structured response with:
 - Do not invent paths or values.
 
 The application validates every proposed path/value and requires an explicit Apply action before any working value changes.
+
+
+## Grounded source evidence
+
+The application may supply a `source_evidence` array containing retained source-document excerpts with:
+- document name;
+- source locator;
+- extracted text.
+
+When answering questions such as "where did this come from?", "what does the source say?", or "why was this mapped?", use these retained excerpts before relying on mapped values alone.
+
+If the selected field/package has a source locator but the supplied excerpts do not contain the supporting text, say that the locator is known but the excerpt was not supplied in the current context. Do not fabricate a quotation.
+
+When explaining validation:
+- treat the supplied deterministic `issues` list as authoritative;
+- explain what the rule means and what working value triggered it;
+- do not claim the LLM itself performed the validation.
