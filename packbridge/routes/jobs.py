@@ -25,11 +25,28 @@ from packbridge.services.mapper import MappingError, map_packing_list
 from packbridge.services.prompt_service import load_prompt
 from packbridge.services.runtime_settings import client as ollama_client
 from packbridge.services.storage import save_job_upload
+from packbridge.services.working_data import (
+    WorkingDataError,
+    dump_packing,
+    has_modifications,
+    issue_counts,
+    load_packing,
+    revert_all,
+    revert_field,
+    revert_package,
+    set_field,
+)
 
 bp = Blueprint("jobs", __name__, url_prefix="/jobs")
 
 
-def _audit(job_id: int, event_type: str, summary: str, payload: dict | None = None, actor: str = "system") -> None:
+def _audit(
+    job_id: int,
+    event_type: str,
+    summary: str,
+    payload: dict | None = None,
+    actor: str = "system",
+) -> None:
     db.session.add(
         AuditEvent(
             job_id=job_id,
@@ -48,6 +65,23 @@ def _working(job: Job) -> dict | None:
         return json.loads(job.working_json)
     except json.JSONDecodeError:
         return None
+
+
+def _save_working(job: Job, packing) -> None:
+    job.working_json = dump_packing(packing)
+    job.status = "edited" if has_modifications(packing) else "mapped"
+    sales_order = packing.order.sales_order.working.value if packing.order.sales_order.working else None
+    job.sales_order = str(sales_order) if sales_order not in (None, "") else None
+
+
+def _selected_package(packages: list[dict], selected_case: str | None):
+    if not packages:
+        return None, None
+    for index, package in enumerate(packages):
+        value = ((package.get("case_number") or {}).get("working") or {}).get("value")
+        if selected_case is not None and str(value) == selected_case:
+            return package, index
+    return packages[0], 0
 
 
 @bp.post("/upload")
@@ -86,7 +120,12 @@ def upload():
         )
         db.session.add(document)
         db.session.flush()
-        _audit(job.id, "source_uploaded", f"Uploaded {original_name}", {"sha256": digest, "size_bytes": size})
+        _audit(
+            job.id,
+            "source_uploaded",
+            f"Uploaded {original_name}",
+            {"sha256": digest, "size_bytes": size},
+        )
 
         extracted = extract_path(path)
         document.page_count = extracted.page_count
@@ -123,31 +162,47 @@ def upload():
 def view(job_id: int):
     job = Job.query.get_or_404(job_id)
     packing = _working(job)
-    selected_case = request.args.get("case")
     packages = (packing or {}).get("packages", [])
-    selected = None
-    if packages:
-        selected = next(
-            (
-                package
-                for package in packages
-                if str(((package.get("case_number") or {}).get("working") or {}).get("value"))
-                == selected_case
-            ),
-            packages[0],
-        )
+    selected, selected_index = _selected_package(packages, request.args.get("case"))
+    counts = {"INFO": 0, "WARNING": 0, "BLOCKING": 0}
+    if job.working_json:
+        try:
+            counts = issue_counts(load_packing(job.working_json))
+        except (ValueError, TypeError):
+            pass
+    audit_events = (
+        AuditEvent.query.filter_by(job_id=job.id)
+        .order_by(AuditEvent.id.desc())
+        .limit(30)
+        .all()
+    )
     return render_template(
         "job.html",
         job=job,
         packing=packing,
         packages=packages,
         selected_package=selected,
+        selected_package_index=selected_index,
+        issue_counts=counts,
+        audit_events=audit_events,
     )
 
 
 @bp.post("/<int:job_id>/process")
 def process(job_id: int):
     job = Job.query.get_or_404(job_id)
+    if (
+        job.source_json
+        and job.working_json
+        and job.source_json != job.working_json
+        and request.form.get("confirm_overwrite") != "1"
+    ):
+        flash(
+            "This job contains working-data changes. Reprocessing is blocked until you explicitly discard them.",
+            "warning",
+        )
+        return redirect(url_for("jobs.view", job_id=job.id))
+
     chunks = (
         SourceChunk.query.join(SourceDocument)
         .filter(SourceDocument.job_id == job.id)
@@ -162,7 +217,12 @@ def process(job_id: int):
     profile_hint = request.form.get("profile_hint", "").strip()
 
     job.status = "processing"
-    _audit(job.id, "mapping_started", "Local document mapping started", {"profile_hint": profile_hint})
+    _audit(
+        job.id,
+        "mapping_started",
+        "Local document mapping started",
+        {"profile_hint": profile_hint},
+    )
     db.session.commit()
 
     try:
@@ -180,7 +240,11 @@ def process(job_id: int):
             job.id,
             "mapping_completed",
             f"Mapped {len(packing.packages)} package(s)",
-            {"packages": len(packing.packages), "model": ollama_client().model},
+            {
+                "packages": len(packing.packages),
+                "model": ollama_client().model,
+                "issues": issue_counts(packing),
+            },
         )
         db.session.commit()
         flash(f"Local mapper returned {len(packing.packages)} package(s).", "success")
@@ -191,6 +255,144 @@ def process(job_id: int):
         db.session.commit()
         flash(str(exc), "danger")
     return redirect(url_for("jobs.view", job_id=job.id))
+
+
+@bp.post("/<int:job_id>/field")
+def edit_field(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    if not job.working_json:
+        return jsonify({"error": "This job has no mapped working data."}), 409
+
+    payload = request.get_json(silent=True) or {}
+    path = str(payload.get("path") or "").strip()
+    reason = str(payload.get("reason") or "").strip()
+    actor = str(payload.get("actor") or "user").strip()[:120] or "user"
+
+    try:
+        packing = load_packing(job.working_json)
+        packing, change = set_field(
+            packing,
+            path,
+            payload.get("value"),
+            unit=payload.get("unit") if "unit" in payload else None,
+            actor=actor,
+            reason=reason,
+        )
+        _save_working(job, packing)
+        _audit(
+            job.id,
+            "working_field_changed",
+            f"Updated {path}",
+            {**change, "reason": reason or None, "issues": issue_counts(packing)},
+            actor=actor,
+        )
+        db.session.commit()
+        return jsonify(
+            {
+                "ok": True,
+                "change": change,
+                "issues": [issue.model_dump() for issue in packing.issues],
+                "issue_counts": issue_counts(packing),
+                "status": job.status,
+            }
+        )
+    except WorkingDataError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@bp.post("/<int:job_id>/field/revert")
+def revert_working_field(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    payload = request.get_json(silent=True) or {}
+    path = str(payload.get("path") or "").strip()
+    if not job.working_json:
+        return jsonify({"error": "This job has no mapped working data."}), 409
+
+    try:
+        packing = load_packing(job.working_json)
+        packing, change = revert_field(packing, path)
+        _save_working(job, packing)
+        _audit(
+            job.id,
+            "working_field_reverted",
+            f"Reverted {path} to source",
+            {**change, "issues": issue_counts(packing)},
+            actor="user",
+        )
+        db.session.commit()
+        return jsonify(
+            {
+                "ok": True,
+                "change": change,
+                "issue_counts": issue_counts(packing),
+                "status": job.status,
+            }
+        )
+    except WorkingDataError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@bp.post("/<int:job_id>/packages/<int:package_index>/revert")
+def revert_working_package(job_id: int, package_index: int):
+    job = Job.query.get_or_404(job_id)
+    if not job.working_json:
+        return jsonify({"error": "This job has no mapped working data."}), 409
+
+    try:
+        packing = load_packing(job.working_json)
+        case_before = (
+            packing.packages[package_index].case_number.working.value
+            if package_index < len(packing.packages)
+            and packing.packages[package_index].case_number.working
+            else None
+        )
+        packing, changed = revert_package(packing, package_index)
+        _save_working(job, packing)
+        _audit(
+            job.id,
+            "working_package_reverted",
+            f"Reverted package {case_before or package_index + 1} to source",
+            {"package_index": package_index, "changed_fields": changed, "issues": issue_counts(packing)},
+            actor="user",
+        )
+        db.session.commit()
+        return jsonify(
+            {
+                "ok": True,
+                "changed_fields": changed,
+                "issue_counts": issue_counts(packing),
+                "status": job.status,
+            }
+        )
+    except (WorkingDataError, IndexError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@bp.post("/<int:job_id>/revert-all")
+def revert_working_job(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    if not job.working_json:
+        return jsonify({"error": "This job has no mapped working data."}), 409
+
+    packing = load_packing(job.working_json)
+    packing, changed = revert_all(packing)
+    _save_working(job, packing)
+    _audit(
+        job.id,
+        "working_job_reverted",
+        "Reverted all working values to source",
+        {"changed_fields": changed, "issues": issue_counts(packing)},
+        actor="user",
+    )
+    db.session.commit()
+    return jsonify(
+        {
+            "ok": True,
+            "changed_fields": changed,
+            "issue_counts": issue_counts(packing),
+            "status": job.status,
+        }
+    )
 
 
 @bp.post("/<int:job_id>/chat")
@@ -228,7 +430,11 @@ def chat(job_id: int):
         "selected_context": context,
         "working_data": _working(job),
     }
-    system_prompt = load_prompt("job_assistant") + "\n\nCURRENT JOB CONTEXT:\n" + json.dumps(job_context, default=str)[:60_000]
+    system_prompt = (
+        load_prompt("job_assistant")
+        + "\n\nCURRENT JOB CONTEXT:\n"
+        + json.dumps(job_context, default=str)[:60_000]
+    )
     result = ollama_client().chat(history, system_prompt=system_prompt)
 
     if result.available:
@@ -236,8 +442,20 @@ def chat(job_id: int):
     else:
         answer = f"Local assistant unavailable: {result.warning or result.error_code}"
 
-    db.session.add(ChatMessage(job_id=job.id, role="assistant", content=answer, context_json=json.dumps(context)))
-    _audit(job.id, "assistant_message", "Assistant responded to job question", {"context": context})
+    db.session.add(
+        ChatMessage(
+            job_id=job.id,
+            role="assistant",
+            content=answer,
+            context_json=json.dumps(context),
+        )
+    )
+    _audit(
+        job.id,
+        "assistant_message",
+        "Assistant responded to job question",
+        {"context": context},
+    )
     db.session.commit()
     return jsonify({"message": answer})
 
@@ -249,7 +467,11 @@ def chat_history(job_id: int):
     return jsonify(
         {
             "messages": [
-                {"role": row.role, "content": row.content, "created_at": row.created_at.isoformat()}
+                {
+                    "role": row.role,
+                    "content": row.content,
+                    "created_at": row.created_at.isoformat(),
+                }
                 for row in messages
             ]
         }
