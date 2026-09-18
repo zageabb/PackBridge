@@ -26,6 +26,7 @@ from packbridge.models import (
     SourceChunk,
     SourceDocument,
     ValidationAcknowledgement,
+    KnowledgeProposalRecord,
 )
 from packbridge.services.assistant_context import build_assistant_context
 from packbridge.services.document_ingestion import (
@@ -34,6 +35,11 @@ from packbridge.services.document_ingestion import (
     extract_path,
 )
 from packbridge.services.knowledge import find_by_title
+from packbridge.services.knowledge_governance import (
+    KnowledgeGovernanceError,
+    append_mapping_example,
+    current_content,
+)
 from packbridge.services.mapper import MappingError, map_packing_list
 from packbridge.services.prompt_service import load_prompt
 from packbridge.services.profile_matching import match_profile
@@ -52,6 +58,7 @@ from packbridge.ssd_schemas import SSDCaseContext, SSDContext
 from packbridge.services.working_data import (
     WorkingDataError,
     dump_packing,
+    get_field,
     has_modifications,
     issue_counts,
     load_packing,
@@ -683,6 +690,102 @@ def reopen_validation_issue(job_id: int):
     )
     db.session.commit()
     return jsonify({"ok": True, "fingerprint": fingerprint})
+
+
+@bp.post("/<int:job_id>/learning/propose-field")
+def propose_field_learning(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    if not job.working_json:
+        return jsonify({"error": "This job has no mapped working data."}), 409
+
+    payload = request.get_json(silent=True) or {}
+    field_path = str(payload.get("path") or "").strip()
+    note = str(payload.get("note") or "").strip()
+    actor = str(payload.get("actor") or "user").strip()[:120] or "user"
+
+    knowledge_root = Path(current_app.config["KNOWLEDGE_ROOT"]).resolve()
+    profile_document = (
+        find_by_title(knowledge_root, job.document_profile)
+        if job.document_profile
+        else None
+    )
+    if profile_document is None:
+        return jsonify(
+            {
+                "error": "This job does not have an approved document profile yet. Open Learning to create one.",
+                "learning_url": url_for("knowledge.index", job=job.id),
+            }
+        ), 409
+
+    try:
+        packing = load_packing(job.working_json)
+        field = get_field(packing, field_path)
+        if not field.modified:
+            raise WorkingDataError(
+                "Profile learning is intended for an explicit working-data correction. Change the field first."
+            )
+
+        source_value = field.source.value if field.source else None
+        working_value = field.working.value if field.working else None
+        source_raw = field.source.raw if field.source else None
+        locator = None
+        if field.source and field.source.evidence:
+            locator = field.source.evidence[0].locator
+
+        relative_path = str(profile_document.relative_to(knowledge_root))
+        _, current, base_hash = current_content(knowledge_root, relative_path)
+        proposed_content, example_fingerprint = append_mapping_example(
+            current,
+            field_path=field_path,
+            source_value=source_value,
+            working_value=working_value,
+            source_raw=source_raw,
+            locator=locator,
+            note=note or (field.working.reason if field.working else None),
+        )
+
+        proposal = KnowledgeProposalRecord(
+            job_id=job.id,
+            target_path=relative_path,
+            base_sha256=base_hash,
+            proposed_content=proposed_content,
+            summary=f"Learn correction for {field_path}",
+            reason=note or (field.working.reason if field.working else None),
+            created_by=actor,
+            status="pending",
+        )
+        db.session.add(proposal)
+        db.session.flush()
+        _audit(
+            job.id,
+            "knowledge_learning_proposed",
+            f"Proposed profile learning from {field_path}",
+            {
+                "proposal_id": proposal.id,
+                "target_path": relative_path,
+                "field_path": field_path,
+                "example_fingerprint": example_fingerprint,
+                "source_value": source_value,
+                "working_value": working_value,
+            },
+            actor=actor,
+        )
+        db.session.commit()
+        return jsonify(
+            {
+                "ok": True,
+                "proposal_id": proposal.id,
+                "target_path": relative_path,
+                "learning_url": url_for(
+                    "knowledge.index",
+                    path=relative_path,
+                    job=job.id,
+                ),
+            }
+        )
+    except (WorkingDataError, KnowledgeGovernanceError, OSError, ValueError) as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
 
 
 @bp.post("/<int:job_id>/ssd-context")
