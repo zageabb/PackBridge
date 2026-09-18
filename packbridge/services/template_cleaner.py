@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 import re
 import tempfile
@@ -42,6 +43,21 @@ def _q(tag: str) -> str:
     return f"{{{MAIN_NS}}}{tag}"
 
 
+def _parse_xml(payload: bytes) -> ET.Element:
+    # Preserve the workbook's namespace prefixes. This matters for mc:Ignorable,
+    # whose attribute value names prefixes such as x15/xr rather than namespace URIs.
+    try:
+        for _, namespace in ET.iterparse(io.BytesIO(payload), events=("start-ns",)):
+            prefix, uri = namespace
+            try:
+                ET.register_namespace(prefix or "", uri)
+            except ValueError:
+                pass
+    except ET.ParseError:
+        pass
+    return ET.fromstring(payload)
+
+
 def _cell_row(ref: str) -> int | None:
     match = re.fullmatch(r"[A-Z]+(\d+)", ref)
     return int(match.group(1)) if match else None
@@ -70,7 +86,7 @@ def _clear_cell_value(cell: ET.Element) -> None:
 
 
 def _clean_socs_xml(payload: bytes) -> bytes:
-    root = ET.fromstring(payload)
+    root = _parse_xml(payload)
     for cell in root.findall(".//" + _q("c")):
         ref = cell.attrib.get("r", "")
         if ref in HEADER_INPUT_CELLS:
@@ -101,7 +117,7 @@ def _remove_content_type_overrides(
     *,
     remove_calc_chain: bool,
 ) -> bytes:
-    root = ET.fromstring(payload)
+    root = _parse_xml(payload)
     for node in list(root):
         part_name = node.attrib.get("PartName", "").lstrip("/")
         if part_name in removed_parts or (remove_calc_chain and part_name == "xl/calcChain.xml"):
@@ -132,8 +148,8 @@ def create_clean_generation_template(
 
     with zipfile.ZipFile(source, "r") as archive:
         names = set(archive.namelist())
-        workbook_root = ET.fromstring(archive.read("xl/workbook.xml"))
-        rels_root = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+        workbook_root = _parse_xml(archive.read("xl/workbook.xml"))
+        rels_root = _parse_xml(archive.read("xl/_rels/workbook.xml.rels"))
         rel_by_id = _relationship_map(rels_root)
 
         sheets_node = workbook_root.find(_q("sheets"))
