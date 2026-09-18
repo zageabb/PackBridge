@@ -7,6 +7,7 @@
     <div class="eyebrow">KNOWLEDGE</div>
     <h1>Mapping guidance</h1>
     <p>Human-readable system and vendor/document-profile guidance used by the local mapper. Changes are proposed first and only become active after approval.</p>
+    {% if job_id %}<div class="learning-job-context">Learning context: Job {{ job_id }}</div>{% endif %}
   </div>
 </section>
 
@@ -25,7 +26,7 @@
       {% for document in documents %}
       <a
         class="{% if selected and selected.path == document.path %}selected{% endif %}"
-        href="{{ url_for('knowledge.index', path=document.path, q=query or none) }}"
+        href="{{ url_for('knowledge.index', path=document.path, q=query or none, job=job_id or none) }}"
       >
         <strong>{{ document.title }}</strong>
         <span>{{ document.path }}</span>
@@ -39,6 +40,7 @@
     <details class="knowledge-new-profile">
       <summary>Propose new document profile</summary>
       <form method="post" action="{{ url_for('knowledge.propose_new') }}" class="knowledge-proposal-form">
+        {% if job_id %}<input type="hidden" name="job_id" value="{{ job_id }}">{% endif %}
         <label>
           <span>Knowledge path</span>
           <input name="target_path" placeholder="vendors/vendor-name/packing-list.md" required>
@@ -84,6 +86,7 @@
           <summary>Propose an update to this Knowledge document</summary>
           <form method="post" action="{{ url_for('knowledge.propose_edit') }}" class="knowledge-proposal-form">
             <input type="hidden" name="target_path" value="{{ selected.path }}">
+            {% if job_id %}<input type="hidden" name="job_id" value="{{ job_id }}">{% endif %}
             <label>
               <span>Summary</span>
               <input name="summary" placeholder="Describe the mapping/profile change">
