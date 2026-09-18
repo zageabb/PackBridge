@@ -926,3 +926,35 @@ body.resizing-assistant {
   color: var(--text);
   line-height: 1.5;
 }
+
+
+.validation-output-section {
+  margin-top: 16px;
+}
+.validation-notice {
+  margin: 10px 0 16px;
+  padding: 11px 13px;
+  border: 1px solid #e2c98e;
+  border-radius: 8px;
+  background: var(--warning-bg);
+  display: grid;
+  gap: 3px;
+}
+.validation-notice strong {
+  color: var(--warning);
+}
+.validation-notice span {
+  line-height: 1.45;
+}
+.output-history-heading {
+  margin-top: 18px;
+  margin-bottom: 9px;
+}
+.output-history-heading h3 {
+  margin: 0 0 3px;
+}
+.output-history-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
