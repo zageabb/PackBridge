@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}PackBridge — Jobs{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div>
+    <div class="eyebrow">PACKING LIST WORKSPACE</div>
+    <h1>Turn vendor packing lists into reviewed SSD data.</h1>
+    <p>Upload a packing list, map it through the local model, review the Virtual SSD, then generate the controlled SAP-ready workbook.</p>
+  </div>
+  <div class="hero-status">
+    <span class="status-dot"></span>
+    Local-first workflow
+  </div>
+</section>
+
+<section class="card upload-card">
+  <div class="section-heading">
+    <div>
+      <h2>New packing list</h2>
+      <p>Current v0.1 input: PDF, DOCX, XLSX/XLSM, CSV, TXT or Markdown.</p>
+    </div>
+  </div>
+  <form action="{{ url_for('jobs.upload') }}" method="post" enctype="multipart/form-data" class="upload-form">
+    <label class="drop-zone" for="packing-list-input">
+      <span class="drop-icon">⇧</span>
+      <strong>Choose a packing list</strong>
+      <span>The original file is retained as source evidence.</span>
+      <input id="packing-list-input" type="file" name="packing_list" required>
+    </label>
+    <button class="btn btn-primary" type="submit">Upload &amp; Extract</button>
+  </form>
+</section>
+
+<section class="card">
+  <div class="section-heading">
+    <div>
+      <h2>Recent jobs</h2>
+      <p>Processing history and current review state.</p>
+    </div>
+  </div>
+
+  {% if jobs %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Job</th>
+          <th>Sales order</th>
+          <th>Vendor</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+        <tr class="click-row" data-href="{{ url_for('jobs.view', job_id=job.id) }}">
+          <td><a href="{{ url_for('jobs.view', job_id=job.id) }}">{{ job.title }}</a></td>
+          <td>{{ job.sales_order or "—" }}</td>
+          <td>{{ job.vendor or "—" }}</td>
+          <td><span class="status status-{{ job.status|replace('_','-') }}">{{ job.status|replace('_',' ') }}</span></td>
+          <td>{{ job.created_at.strftime("%d %b %Y %H:%M") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <strong>No jobs yet.</strong>
+    <span>Upload the first packing list to begin.</span>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll(".click-row").forEach((row) => {
+  row.addEventListener("click", (event) => {
+    if (event.target.closest("a")) return;
+    window.location.href = row.dataset.href;
+  });
+});
+</script>
+{% endblock %}
