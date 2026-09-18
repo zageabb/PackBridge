@@ -11,6 +11,7 @@ from .knowledge import context_for
 from .normalise import to_packing_list
 from .prompt_service import render_prompt
 from .runtime_settings import client
+from .validation import validate_packing_list
 
 
 MAX_MAPPING_TEXT = 120_000
@@ -38,4 +39,5 @@ def map_packing_list(document_text: str, profile_hint: str = "") -> PackingList:
     if not result.available:
         raise MappingError(result.warning or result.error_code or "Local mapper failed.")
 
-    return to_packing_list(result.value)
+    packing = to_packing_list(result.value)
+    return validate_packing_list(packing)
