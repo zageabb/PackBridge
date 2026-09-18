@@ -2,23 +2,27 @@
 
 ## Current state
 
-PackBridge is now in active application development. The repository contains a runnable Flask/Python application and the second development slice has been implemented.
+PackBridge is in active application development with a runnable Flask/Python application, verified reference-document regression knowledge and a guarded SSD validation-output path.
 
 The selected local deployment port is **5085**.
 
 ## Implemented
 
-### Application shell
+### Application shell and deployment packaging
 
 - Flask application factory
 - SQLite/SQLAlchemy operational models
-- job/source/chat/audit records
+- Jobs / SSD Projects / Knowledge / Settings navigation
 - managed source/working/output storage layout
-- Jobs / Knowledge / Settings navigation
 - responsive two-panel job workspace
-- collapsible and resizable right-hand local assistant
+- collapsible/resizable local assistant
 - Ollama settings/model discovery
 - health/readiness endpoints
+- user-systemd example for port 5085
+- Universal Deployment Agent registry fragment
+- external operational data/template paths in deployment examples
+
+The deployment package is prepared but has not been registered on the live Ubuntu host from this chat.
 
 ### Document ingestion
 
@@ -28,26 +32,26 @@ The selected local deployment port is **5085**.
 - DOCX paragraph/heading/table extraction
 - XLSX/XLSM worksheet extraction
 - CSV/TXT/Markdown support
-- file signature/Office container safety checks
-- extraction size limits
+- Office-container safety checks and extraction limits
 - stored source section locators
 
 ### Generic mapping
 
-- local Ollama typed JSON client
+- local typed Ollama JSON client
 - baseline model `qwen3:14b`
 - generic packing-list mapping prompt
-- vendor/document Knowledge context
+- relevant vendor/document Knowledge context
 - canonical source/working value model
 - raw source evidence/locator support
-- package and item structures
-- continuation-page instruction
+- deterministic Knowledge-profile matching
 - deterministic post-mapping validation
-- deterministic Knowledge-profile matching before mapping
+- deterministic continuation-page merge by Case Number
+- conflict warnings rather than silent continuation overwrite
+- regression test for 20 page records collapsing to the known 17 reference cases
 
 ### Knowledge
 
-Initial document-driven Knowledge includes:
+Initial Knowledge includes:
 
 - canonical schema
 - generic packing-list mapping rules
@@ -55,15 +59,13 @@ Initial document-driven Knowledge includes:
 - SSD output safety rules
 - initial Hitachi Energy QBANK reference profile
 
-The HE profile remains guidance to the generic mapper, not a separate parser.
+The vendor profile remains guidance to the generic mapper, not a separate parser.
 
-A read-only Knowledge browser and search page are now available. Governed Knowledge editing/approval is still pending.
+A read-only Knowledge browser/search page is implemented. Governed editing, versioning and approval remain pending.
 
 ### Virtual SSD
 
-The Virtual SSD is now an editable working-data layer rather than display-only.
-
-A separate SSD project/default context layer has also been added so output-only values are not falsely attributed to the packing-list source.
+The Virtual SSD is an editable working-data layer.
 
 Implemented:
 
@@ -73,18 +75,89 @@ Implemented:
 - package details
 - dimensions/weights
 - editable item grid
-- source / working value separation
-- modified-value indicators
+- immutable source vs editable working values
+- source/modified indicators
 - original source value shown for modified fields
-- field-level revert
-- case-level revert
-- whole-job revert
-- immediate deterministic revalidation after edits
-- Issues section with INFO / WARNING / BLOCKING counts
-- Source section
-- audit timeline
+- field/case/job revert
+- immediate deterministic revalidation
+- Issues / Source / Audit sections
+- source-locator jump from the field editor
+- separate SSD project/default output context
+- case-specific SSD overrides that inherit the job defaults
+- read-only proposed SoCs_Temp output preview
 
-The source evidence is never overwritten by a user edit.
+### Multi-job SSD Projects
+
+A separate SSD Project workspace now supports the architecture shown by the reference workbook, where several packing-list positions feed one SSD.
+
+Implemented:
+
+- create SSD project
+- attach/remove mapped packing-list jobs
+- one job belongs to one SSD project
+- package rows are aggregated in attachment order
+- source job retained on every aggregated preview row
+- duplicate Case Numbers across jobs are blocking
+- 68-row SoCs template capacity is enforced
+- project-level SSD header/default context
+- each job retains its own canonical PO/position when project defaults are blank
+- combined SoCs output preview
+
+### SSD workbook reverse engineering
+
+The reference packing list and reference SSD workbook were inspected directly.
+
+Verified findings include:
+
+- the PDF is 20 pages but represents 17 unique cases;
+- cases 48366844, 48366845 and 48366846 continue onto a second page;
+- the reference SSD contains 68 SoCs package rows across several positions;
+- SoCs_Temp is the central package dataset;
+- PLs_Temp and MLs_Temp are very-hidden templates;
+- generated PL/ML sheets and VBA are part of the workbook's document-generation workflow;
+- direct verified package mappings include dimensions, volume formula, net/gross weights and Case Number;
+- a historical SSD row disagrees with the supplied source PDF, so the historical workbook is not treated as golden truth.
+
+Detailed findings are in `docs/16_SSD_WORKBOOK_REVERSE_ENGINEERING.md`.
+
+### Controlled SSD template management
+
+Implemented:
+
+- XLSM/XLSX structural inspector
+- required worksheet/state checks
+- Table2 `C22:W90` check
+- verified SoCs header checks
+- verified data-validation checks
+- VBA presence detection
+- file SHA-256 and structural fingerprint
+- populated-template vs generation-ready distinction
+- versioned template installation
+- controlled cleaner that removes generated PL/ML sheets, clears SoCs input values, retains formulas/styles/validations/VBA and removes stale calc-chain/defined-name references
+- post-clean structural reinspection
+
+A live approved generation template still needs to be installed/accepted on the deployment host.
+
+### Guarded validation SSD writer
+
+The first deterministic writer is implemented for **validation output only**.
+
+It:
+
+- requires a clean structurally verified template;
+- requires the macro-enabled template for the current path;
+- refuses previews with blocking issues;
+- writes only the verified SoCs header/package locations;
+- never overwrites the volume formula column M;
+- preserves the OOXML package and VBA project;
+- reopens the generated workbook;
+- checks the structural fingerprint;
+- compares every explicitly written cell with the approved preview;
+- records output SHA-256, template SHA, structure fingerprint and row/cell counts.
+
+SSD Projects can build and download a clearly labelled **VALIDATION** workbook only when the combined preview has no warnings/blockers and the controlled template is generation-ready.
+
+This is not yet the final production/SAP-approved Generate SSD action.
 
 ### Assistant
 
@@ -93,11 +166,11 @@ The source evidence is never overwritten by a user edit.
 - selected case supplied as context
 - local Ollama only
 - collapsible/resizable panel
-- assistant remains unable to write the final SSD workbook
+- assistant cannot directly write the SSD workbook
 
-Assistant Apply/Cancel change proposals are still a later slice.
+Assistant proposed data changes with explicit Apply/Cancel remain pending.
 
-### Validation
+### Validation and audit
 
 Current deterministic checks include:
 
@@ -105,29 +178,19 @@ Current deterministic checks include:
 - gross/net numeric checks
 - gross below net warning
 - incomplete/invalid dimensions
-- item quantity checks
-- quantity without UOM
-- issue severity counts
+- item quantity/UOM checks
+- continuation conflict checks
+- SSD list-value checks
+- SSD missing-context checks
+- template capacity checks
+- cross-job duplicate cases
+- INFO/WARNING/BLOCKING severity
 
-Validation runs after initial mapping and after every working-data change/revert.
-
-### Audit
-
-The job workspace now shows an append-oriented audit timeline for:
-
-- uploads
-- extraction
-- profile matching
-- mapping
-- working-field edits
-- field/case/job reverts
-- assistant messages
-
-The mapping event records the local model used.
+Audit history includes uploads, extraction, profile matching, mapping, working edits/reverts, assistant messages and SSD context changes.
 
 ### Automated tests
 
-Tests now cover:
+The pytest suite now covers:
 
 - CSV/XLSX ingestion
 - canonical normalisation
@@ -135,65 +198,55 @@ Tests now cover:
 - Knowledge search
 - Ollama request behaviour
 - working-data edits/reverts
-- deterministic document-profile matching
+- document-profile matching
+- continuation-page merging
+- 20-page → 17-case reference regression
+- SSD output preview and unit conversions
+- SSD template structure validation
+- controlled template cleaning
+- guarded SoCs writer
+- multi-job aggregation
+- Flask route/template smoke tests
 
-A GitHub Actions pytest workflow exists, but a workflow execution result has not yet been observed through the connected GitHub interface.
+GitHub Actions is running these tests on every push. The test suite returned **success** after the writer-fixture correction on the current development line.
 
 ## Port
 
-The application default and `.env.example` now use:
+The application default, environment examples and deployment service use:
 
-```text
+~~~text
 5085
-```
+~~~
 
-The deployment agent's live port inventory should only be amended once PackBridge is actually deployed and verified on the host.
+The live deployment agent inventory should only be amended after port 5085 is rechecked on the actual host and the service passes its first manual health check.
 
 ## Intentionally not implemented yet
 
-The following remain deliberately deferred:
-
-- PDF page-image rendering / side-by-side source popup
+- PDF page-image rendering / side-by-side visual source viewer
 - local OCR/vision fallback
 - staged mapper for very large documents
 - assistant Apply/Cancel data-change proposals
-- warning override/acknowledgement workflow
-- Learning/Knowledge amendment approvals and versioning
-- the remaining non-source/project canonical-to-SSD mappings
-- multi-packing-list/project aggregation
-- final SSD generation
-- SAP import acceptance validation
-
-## SSD reverse engineering completed in this slice
-
-The reference packing list and reference SSD workbook were inspected directly.
-
-Verified findings include:
-
-- the PDF is 20 pages but represents 17 unique cases;
-- cases 48366844, 48366845 and 48366846 continue onto a second page;
-- the SSD workbook contains 68 SoCs package rows across several positions, so one packing list is only part of the complete SSD;
-- SoCs_Temp is the central package dataset;
-- PLs_Temp and MLs_Temp are very-hidden templates;
-- the workbook contains generated PL/ML sheets and VBA that creates/refreshes them and produces PDFs;
-- the first safe direct canonical mappings are dimensions, volume formula, net/gross weights and case number;
-- at least one historical SSD row differs from the supplied source packing list, confirming that the historical workbook must not be treated as golden truth.
-
-A controlled template inspector and versioned template installer are now implemented. It distinguishes structural compatibility from a clean generation template.
-
-The job workspace now includes a deterministic read-only SoCs output preview and forms for SSD-specific project/default values.
+- warning acknowledgement/override workflow
+- Learning/Knowledge amendment approvals/versioning
+- detailed PL/ML item-output mapping
+- generated PL/ML sheet recreation by PackBridge itself
+- final SAP-approved production output
+- macro-free XLSX output
+- live Ubuntu registration/deployment
 
 ## Next development slice
 
-1. Deploy/run PackBridge on port 5085.
-2. Process the real reference HE packing list through qwen3:14b and compare the mapped result against the known 17-case shape.
-3. Add per-case SSD context overrides and project/workspace aggregation.
-4. Add assistant proposed changes with explicit Apply/Cancel.
-5. Build a controlled clean SSD template from the verified workbook structure.
-6. Implement the first deterministic SoCs writer against a copied macro-enabled template.
-7. Re-open and verify every generated value/structure before enabling the download button.
-8. Test the resulting workbook through the actual SAP import before considering a macro-free XLSX path.
+1. Deploy/run PackBridge on port 5085 with automatic deployment initially disabled.
+2. Install the reference SSD workbook and derive the clean generation template through Settings.
+3. Process the real reference HE packing list through `qwen3:14b` and compare its canonical result with the known 17-case regression.
+4. Build a validation SSD and compare the position-10 SoCs rows against source/working data.
+5. Add assistant proposed field changes with explicit Apply/Cancel.
+6. Add governed Knowledge learning/versioning.
+7. Define the remaining PL/ML item-level output rules.
+8. Run an actual SAP acceptance test before enabling the final production Generate SSD path or any macro-free XLSX option.
 
-## Current design constraint
+## Current safety constraint
 
-Do not implement the final SSD writer from assumptions. The workbook is SAP-sensitive and must be inspected, mapped and regression-tested before the output path becomes active.
+No final production mapping should be added from workbook appearance or naming alone.
+
+Only fields verified from the reference workbook/business process should enter the deterministic writer. New mappings must be documented, tested and rechecked against source/working data before the production output path is enabled.
