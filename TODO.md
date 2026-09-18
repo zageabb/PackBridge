@@ -111,7 +111,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Pass selected case/field as assistant context.
 - [x] Allow "where did this come from?" evidence queries.
 - [x] Explain validation failures.
-- [ ] Answer structured shipment questions through application tools/data.
+- [x] Answer structured shipment questions through application tools/data.
 - [x] Add assistant-proposed data changes with Apply/Cancel.
 - [x] Add assistant-generated clarification questions during processing.
 - [x] Persist job chat.
