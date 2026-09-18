@@ -272,3 +272,55 @@ def test_assistant_proposal_requires_explicit_apply_or_reject(tmp_path):
         unchanged = Job.query.get(job_id)
         current = PackingList.model_validate_json(unchanged.working_json)
         assert current.packages[0].net_weight.working.value == 9
+
+
+
+def test_source_evidence_endpoint_returns_retained_chunk(tmp_path):
+    TestConfig = type(
+        "TestConfig",
+        (Config,),
+        {
+            "TESTING": True,
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///" + str(tmp_path / "test.sqlite3"),
+            "DATA_ROOT": tmp_path / "data",
+            "KNOWLEDGE_ROOT": tmp_path / "knowledge",
+            "TEMPLATE_ROOT": tmp_path / "templates",
+        },
+    )
+    app = create_app(TestConfig)
+
+    from packbridge.models import SourceChunk, SourceDocument
+
+    with app.app_context():
+        job = Job(title="Evidence Route", status="mapped")
+        db.session.add(job)
+        db.session.flush()
+        document = SourceDocument(
+            job_id=job.id,
+            original_name="packing.pdf",
+            stored_name="packing.pdf",
+            path="/tmp/packing.pdf",
+            size_bytes=1,
+            sha256="c" * 64,
+            extraction_status="complete",
+        )
+        db.session.add(document)
+        db.session.flush()
+        db.session.add(
+            SourceChunk(
+                document_id=document.id,
+                position=14,
+                locator="Page 14",
+                text="Case CASE-1 Gross Weight 830 KG",
+            )
+        )
+        db.session.commit()
+        job_id = job.id
+
+    client = app.test_client()
+    response = client.get(f"/jobs/{job_id}/source-evidence?locator=Page%2014")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["matches"][0]["locator"] == "Page 14"
+    assert "830 KG" in payload["matches"][0]["text"]
