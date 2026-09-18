@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}PackBridge — {{ job.title }}{% endblock %}
+{% block main_class %}job-page{% endblock %}
+
+{% macro value_of(field) -%}
+  {%- if field and field.working -%}{{ field.working.value if field.working.value is not none else "—" }}{%- else -%}—{%- endif -%}
+{%- endmacro %}
+
+{% macro field_row(label, field, suffix="") %}
+<div class="ssd-field {% if field and field.modified %}field-modified{% endif %}">
+  <div class="ssd-field-label">{{ label }}</div>
+  <div class="ssd-field-value">
+    <span>{{ value_of(field) }}</span>
+    {% if suffix %}<small>{{ suffix }}</small>{% endif %}
+  </div>
+  <div class="ssd-origin">
+    {% if field and field.modified %}
+      <span title="User modified">✎</span>
+    {% elif field and field.working and field.working.origin == "calculated" %}
+      <span title="Calculated">ƒ</span>
+    {% elif field and field.working and field.working.origin in ["project_data", "default_rule"] %}
+      <span title="Project/default">●</span>
+    {% elif field and field.source %}
+      <span title="Source">✓</span>
+    {% else %}
+      <span title="Missing">?</span>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="job-shell" id="job-shell" data-job-id="{{ job.id }}">
+  <section class="job-workspace">
+    <div class="job-header">
+      <div>
+        <div class="eyebrow">VIRTUAL SSD WORKSPACE</div>
+        <h1>{{ job.sales_order or job.title }}</h1>
+        <div class="job-meta">
+          <span>{{ job.vendor or "Vendor not yet identified" }}</span>
+          <span>•</span>
+          <span>{{ job.document_profile or "Generic mapper" }}</span>
+        </div>
+      </div>
+      <div class="job-actions">
+        <span class="status status-{{ job.status|replace('_','-') }}">{{ job.status|replace('_',' ') }}</span>
+        {% if job.status in ["extracted", "mapping_failed"] %}
+        <form method="post" action="{{ url_for('jobs.process', job_id=job.id) }}" class="process-form">
+          <input type="text" name="profile_hint" placeholder="Optional vendor/profile hint">
+          <button class="btn btn-primary" type="submit">Run Local Mapper</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if job.error_message %}
+    <div class="issue-banner">
+      <strong>Processing issue</strong>
+      <span>{{ job.error_message }}</span>
+    </div>
+    {% endif %}
+
+    {% if packing %}
+      <div class="workspace-tabs">
+        <a class="active" href="{{ url_for('jobs.view', job_id=job.id) }}">Summary</a>
+        {% for package in packages[:12] %}
+          {% set case_value = package.case_number.working.value if package.case_number and package.case_number.working else "Case" %}
+          <a class="{% if selected_package == package %}case-active{% endif %}" href="{{ url_for('jobs.view', job_id=job.id, case=case_value) }}">{{ case_value }}</a>
+        {% endfor %}
+        {% if packages|length > 12 %}
+          <span class="tab-more">+{{ packages|length - 12 }}</span>
+        {% endif %}
+        <a href="#source">Source</a>
+      </div>
+
+      <section class="summary-card">
+        <div class="section-heading">
+          <div>
+            <h2>Shipment summary</h2>
+            <p>{{ packages|length }} package(s) mapped by the local model.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table compact">
+            <thead>
+              <tr>
+                <th>Case</th>
+                <th>L</th>
+                <th>W</th>
+                <th>H</th>
+                <th>Gross</th>
+                <th>Net</th>
+                <th>Items</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for package in packages %}
+              {% set case_value = package.case_number.working.value if package.case_number and package.case_number.working else "—" %}
+              <tr class="{% if selected_package == package %}selected-row{% endif %}">
+                <td><a href="{{ url_for('jobs.view', job_id=job.id, case=case_value) }}">{{ case_value }}</a></td>
+                <td>{{ value_of(package.dimensions.length) }}</td>
+                <td>{{ value_of(package.dimensions.width) }}</td>
+                <td>{{ value_of(package.dimensions.height) }}</td>
+                <td>{{ value_of(package.gross_weight) }}</td>
+                <td>{{ value_of(package.net_weight) }}</td>
+                <td>{{ package.items|length }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {% if selected_package %}
+      <section class="ssd-card" id="case-panel">
+        {% set selected_case = selected_package.case_number.working.value if selected_package.case_number.working else "Case" %}
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">CASE</div>
+            <h2>{{ selected_case }}</h2>
+          </div>
+          <button class="btn btn-secondary" type="button" disabled title="Editing is the next development slice">Edit values</button>
+        </div>
+
+        <div class="ssd-grid">
+          <div class="ssd-section">
+            <h3>Package</h3>
+            {{ field_row("Case Number", selected_package.case_number) }}
+            {{ field_row("Internal Reference", selected_package.internal_reference) }}
+            {{ field_row("Package Type", selected_package.package_type) }}
+            {{ field_row("Package Description", selected_package.package_description) }}
+            {{ field_row("Status", selected_package.status) }}
+            {{ field_row("Packed By", selected_package.packed_by) }}
+            {{ field_row("Pack Date", selected_package.pack_date) }}
+          </div>
+          <div class="ssd-section">
+            <h3>Dimensions &amp; weights</h3>
+            {{ field_row("Length", selected_package.dimensions.length, selected_package.dimensions.unit or "") }}
+            {{ field_row("Width", selected_package.dimensions.width, selected_package.dimensions.unit or "") }}
+            {{ field_row("Height", selected_package.dimensions.height, selected_package.dimensions.unit or "") }}
+            {{ field_row("Volume", selected_package.volume, selected_package.volume.working.unit if selected_package.volume.working else "") }}
+            {{ field_row("Gross Weight", selected_package.gross_weight, selected_package.gross_weight.working.unit if selected_package.gross_weight.working else "") }}
+            {{ field_row("Net Weight", selected_package.net_weight, selected_package.net_weight.working.unit if selected_package.net_weight.working else "") }}
+          </div>
+        </div>
+
+        <div class="items-panel">
+          <h3>Contents</h3>
+          <div class="table-wrap">
+            <table class="data-table compact">
+              <thead>
+                <tr><th>Seq.</th><th>Pos.</th><th>Item</th><th>Description</th><th>Serial</th><th>Qty</th><th>UOM</th></tr>
+              </thead>
+              <tbody>
+                {% for item in selected_package.items %}
+                <tr>
+                  <td>{{ value_of(item.sequence) }}</td>
+                  <td>{{ value_of(item.position) }}</td>
+                  <td>{{ value_of(item.item_number) }}</td>
+                  <td>{{ value_of(item.description) }}</td>
+                  <td>{{ value_of(item.serial_number) }}</td>
+                  <td>{{ value_of(item.quantity) }}</td>
+                  <td>{{ value_of(item.uom) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="muted-cell">No line items mapped for this case.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      {% endif %}
+
+      <section class="card source-card" id="source">
+        <div class="section-heading">
+          <div>
+            <h2>Source evidence</h2>
+            <p>Extracted sections retained from the original packing list.</p>
+          </div>
+        </div>
+        {% for document in job.documents %}
+          <details {% if loop.first %}open{% endif %}>
+            <summary>{{ document.original_name }} · {{ document.page_count or "?" }} page(s)</summary>
+            <div class="source-chunks">
+              {% for chunk in document.chunks[:30] %}
+              <article>
+                <strong>{{ chunk.locator }}</strong>
+                <pre>{{ chunk.text }}</pre>
+              </article>
+              {% endfor %}
+              {% if document.chunks|length > 30 %}
+                <p class="muted">Additional source sections retained but not shown in this first UI slice.</p>
+              {% endif %}
+            </div>
+          </details>
+        {% endfor %}
+      </section>
+
+      <div class="final-bar">
+        <div>
+          <strong>Virtual SSD preview</strong>
+          <span>Editing, validation and final SSD generation are the next development slices.</span>
+        </div>
+        <button class="btn btn-primary" disabled>Generate SSD</button>
+      </div>
+
+    {% else %}
+      <section class="card extraction-card">
+        <div class="section-heading">
+          <div>
+            <h2>Source extraction complete</h2>
+            <p>The original document has been stored and its text has been extracted. Run the local mapper to build the Virtual SSD.</p>
+          </div>
+        </div>
+        {% for document in job.documents %}
+          <div class="document-row">
+            <div>
+              <strong>{{ document.original_name }}</strong>
+              <span>{{ document.page_count or "—" }} page(s) · {{ document.chunks|length }} extracted section(s)</span>
+            </div>
+            <span class="status status-{{ document.extraction_status }}">{{ document.extraction_status }}</span>
+          </div>
+        {% endfor %}
+      </section>
+    {% endif %}
+  </section>
+
+  <aside class="assistant-panel" id="assistant-panel">
+    <div class="assistant-header">
+      <div>
+        <strong>Local Assistant</strong>
+        <span>Job-aware • local Ollama</span>
+      </div>
+      <button class="icon-btn" type="button" id="assistant-collapse" title="Collapse assistant">›</button>
+    </div>
+
+    <div class="assistant-context">
+      <span>Context</span>
+      <strong id="assistant-context-label">
+        {% if selected_package and selected_package.case_number.working %}
+          Case {{ selected_package.case_number.working.value }}
+        {% else %}
+          Whole job
+        {% endif %}
+      </strong>
+    </div>
+
+    <div class="chat-history" id="chat-history">
+      <div class="chat-message assistant">
+        {% if packing %}
+          I have the mapped job context. Ask where a value came from, why something looks wrong, or about this shipment.
+        {% elif job.status == "extracted" %}
+          Source extraction is ready. Run the local mapper to create the Virtual SSD.
+        {% else %}
+          I will help with processing issues and review questions for this job.
+        {% endif %}
+      </div>
+    </div>
+
+    <form class="chat-form" id="chat-form">
+      <textarea id="chat-message" rows="3" placeholder="Ask about this job…"></textarea>
+      <button class="btn btn-primary" type="submit">Send</button>
+    </form>
+  </aside>
+
+  <button class="assistant-reopen" id="assistant-reopen" type="button" hidden>AI</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.PACKBRIDGE_JOB = {
+  id: {{ job.id }},
+  selectedCase: {{ (selected_package.case_number.working.value if selected_package and selected_package.case_number.working else none)|tojson }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}
