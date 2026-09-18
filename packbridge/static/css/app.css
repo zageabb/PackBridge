@@ -1358,3 +1358,32 @@ body.resizing-assistant {
     flex-direction: column;
   }
 }
+
+
+/* Learning recommendation */
+.learning-banner {
+  margin-bottom: 18px;
+  padding: 13px 14px;
+  border: 1px solid var(--line-strong);
+  border-left: 4px solid var(--accent-2);
+  border-radius: 9px;
+  background: var(--accent-soft);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+}
+.learning-banner > div {
+  display: grid;
+  gap: 3px;
+}
+.learning-banner span {
+  color: var(--muted);
+  line-height: 1.45;
+}
+@media (max-width: 720px) {
+  .learning-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
