@@ -36,11 +36,13 @@ def make_populated_template(path):
         "T21": "Packaging Material",
         "U21": "Stackability",
     }
-    cells = "".join(inline_cell(ref, value) for ref, value in headers.items())
-    cells += inline_cell("E12", "Supplier A")
-    cells += inline_cell("D23", "QBANK")
-    cells += inline_cell("S23", "CASE-1")
-    cells += '<c r="M23"><f>J23*K23*L23/1000000</f><v>1.0</v></c>'
+    header_cells = "".join(inline_cell(ref, value) for ref, value in headers.items())
+    row12_cells = inline_cell("E12", "Supplier A")
+    row23_cells = (
+        inline_cell("D23", "QBANK")
+        + '<c r="M23"><f>J23*K23*L23/1000000</f><v>1.0</v></c>'
+        + inline_cell("S23", "CASE-1")
+    )
 
     validations = "".join(
         f'<dataValidation type="list" sqref="{ref}"><formula1>"x"</formula1></dataValidation>'
@@ -75,7 +77,11 @@ def make_populated_template(path):
     </Relationships>'''
     sheet1 = f'''<?xml version="1.0" encoding="UTF-8"?>
     <worksheet xmlns="{MAIN}">
-      <sheetData><row r="21">{cells}</row></sheetData>
+      <sheetData>
+        <row r="12">{row12_cells}</row>
+        <row r="21">{header_cells}</row>
+        <row r="23">{row23_cells}</row>
+      </sheetData>
       <dataValidations count="6">{validations}</dataValidations>
     </worksheet>'''
     empty = f'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="{MAIN}"><sheetData/></worksheet>'
