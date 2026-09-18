@@ -25,14 +25,14 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [ ] Add SQLite database initialisation/migrations.
 - [x] Create job/workspace model.
 - [x] Create file-storage layout for source, working artefacts and outputs.
-- [ ] Add basic top navigation: Jobs / Knowledge / Settings.
+- [x] Add basic top navigation: Jobs / Knowledge / Settings.
 - [x] Build two-panel responsive workspace.
-- [ ] Make assistant panel collapsible/resizable.
+- [x] Make assistant panel collapsible/resizable.
 - [x] Add diagnostics page for Ollama connection/model status.
 
 ## Phase 2 — Upload and document ingestion
 
-- [ ] Add drag/drop and file-picker upload.
+- [x] Add drag/drop and file-picker upload.
 - [x] Store original source file unchanged.
 - [x] Implement digital PDF text extraction.
 - [ ] Implement PDF page rendering for source verification.
@@ -63,12 +63,12 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 - [x] Load `knowledge/system/*.md`.
 - [x] Load vendor/document-profile Markdown.
-- [ ] Add profile matching using deterministic document indicators.
+- [x] Add profile matching using deterministic document indicators.
 - [ ] Add document-profile/version metadata.
 - [ ] Parse/validate structured YAML/JSON rule blocks.
 - [x] Select only relevant knowledge for each prompt.
 - [ ] Support approved few-shot examples.
-- [ ] Add Knowledge browser/editor.
+- [ ] Add Knowledge browser/editor. *(read-only browser complete; governed editing still pending)*
 - [ ] Add validation before activating changed knowledge.
 - [ ] Add import/export/replace workflow for remote support.
 
@@ -76,15 +76,15 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 - [x] Create Summary tab.
 - [x] Create case tabs / searchable case selector.
-- [ ] Create editable SSD-style field layout.
-- [ ] Create editable item grid.
+- [x] Create editable SSD-style field layout.
+- [x] Create editable item grid.
 - [x] Add origin indicators: source / modified / calculated / project-default / issue.
-- [ ] Show original/source value for modified fields.
-- [ ] Add field-level revert.
-- [ ] Add case-level revert.
-- [ ] Add job-level revert.
-- [ ] Add Previous/Next case navigation.
-- [ ] Add Issues tab.
+- [x] Show original/source value for modified fields.
+- [x] Add field-level revert.
+- [x] Add case-level revert.
+- [x] Add job-level revert.
+- [x] Add Previous/Next case navigation.
+- [x] Add Issues tab.
 - [x] Add Source tab.
 - [ ] Add Output Preview tab.
 - [ ] Add source-verification popup with source page next to Virtual SSD data.
@@ -98,7 +98,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Validate item quantities/UOMs.
 - [ ] Validate required SSD fields.
 - [x] Add INFO/WARNING/BLOCKING severities.
-- [ ] Revalidate immediately after working-data edits.
+- [x] Revalidate immediately after working-data edits.
 - [ ] Add warning acknowledgement/override audit where appropriate.
 - [ ] Prevent normal generation while unresolved blocking issues remain.
 
@@ -142,11 +142,11 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 ## Phase 10 — Audit, security and production readiness
 
-- [ ] Add job audit timeline.
-- [ ] Record model/version used.
+- [x] Add job audit timeline.
+- [x] Record model/version used.
 - [ ] Record knowledge/profile version.
 - [ ] Record template version.
-- [ ] Record every user/assistant-approved change.
+- [x] Record every user/assistant-approved change.
 - [ ] Add user authentication if required for production deployment.
 - [ ] Add role/permission design for edit/approve/knowledge administration.
 - [ ] Define file-retention policy.
@@ -161,7 +161,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [ ] Build golden test set from multiple packing-list formats.
 - [ ] Add expected canonical JSON for each test document.
 - [ ] Add continuation-page regression tests.
-- [ ] Add source-vs-working edit tests.
+- [x] Add source-vs-working edit tests.
 - [x] Add validation tests.
 - [ ] Add SSD structure regression tests.
 - [ ] Benchmark 14B baseline.
