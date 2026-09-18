@@ -6,6 +6,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
+import fitz
 from docx import Document
 from openpyxl import load_workbook
 from pypdf import PdfReader
@@ -137,12 +138,107 @@ def extract_path(path: str | Path) -> ExtractedDocument:
     return ExtractedDocument(suffix, chunks)
 
 
-def _extract_pdf(payload: bytes) -> ExtractedDocument:
-    if not payload.startswith(b"%PDF-"):
-        raise DocumentIngestionError("The file does not have a valid PDF signature.")
+def _point_in_rect(x: float, y: float, rect) -> bool:
+    try:
+        x0, y0, x1, y1 = rect
+        return x0 <= x <= x1 and y0 <= y <= y1
+    except (TypeError, ValueError):
+        return False
+
+
+def _extract_pdf_with_pymupdf(payload: bytes) -> ExtractedDocument:
+    document = fitz.open(stream=payload, filetype="pdf")
+    try:
+        if document.page_count > MAX_PDF_PAGES:
+            raise DocumentIngestionError(
+                f"PDF exceeds the {MAX_PDF_PAGES}-page extraction limit."
+            )
+
+        chunks: list[ExtractedChunk] = []
+        total = 0
+
+        for page_number in range(1, document.page_count + 1):
+            page = document.load_page(page_number - 1)
+
+            tables = []
+            try:
+                finder = page.find_tables()
+                tables = list(finder.tables)
+            except Exception:
+                # Table recognition is an enhancement. Normal PDF text extraction
+                # remains available if a particular page cannot be analysed.
+                tables = []
+
+            table_rects = [tuple(table.bbox) for table in tables if table.bbox]
+
+            outside_blocks = []
+            for block in page.get_text("blocks"):
+                if len(block) < 5:
+                    continue
+                x0, y0, x1, y1, raw_text = block[:5]
+                text = str(raw_text or "").strip()
+                if not text:
+                    continue
+                centre_x = (float(x0) + float(x1)) / 2
+                centre_y = (float(y0) + float(y1)) / 2
+                if any(_point_in_rect(centre_x, centre_y, rect) for rect in table_rects):
+                    continue
+                outside_blocks.append(text)
+
+            page_text = "\n".join(outside_blocks).strip()
+            if not page_text and not tables:
+                page_text = (page.get_text("text") or "").strip()
+
+            if page_text:
+                total += len(page_text)
+                if total > MAX_EXTRACTED_CHARS:
+                    raise DocumentIngestionError(
+                        "Extracted document text exceeds the safety limit."
+                    )
+                chunks.extend(
+                    _chunks_from_text(
+                        f"Page {page_number}",
+                        page_text,
+                        len(chunks) + 1,
+                    )
+                )
+
+            for table_number, table in enumerate(tables, 1):
+                try:
+                    rows = table.extract()
+                except Exception:
+                    rows = []
+                rendered = _rows_to_markdown(rows or [])
+                if not rendered:
+                    continue
+                total += len(rendered)
+                if total > MAX_EXTRACTED_CHARS:
+                    raise DocumentIngestionError(
+                        "Extracted document text exceeds the safety limit."
+                    )
+                chunks.extend(
+                    _chunks_from_text(
+                        f"Page {page_number}, Table {table_number}",
+                        rendered,
+                        len(chunks) + 1,
+                    )
+                )
+
+        if not chunks:
+            raise DocumentIngestionError(
+                "No readable PDF text was found. A local OCR/vision fallback will be required for this document."
+            )
+        return ExtractedDocument(".pdf", chunks, page_count=document.page_count)
+    finally:
+        document.close()
+
+
+def _extract_pdf_with_pypdf(payload: bytes) -> ExtractedDocument:
     reader = PdfReader(io.BytesIO(payload))
     if len(reader.pages) > MAX_PDF_PAGES:
-        raise DocumentIngestionError(f"PDF exceeds the {MAX_PDF_PAGES}-page extraction limit.")
+        raise DocumentIngestionError(
+            f"PDF exceeds the {MAX_PDF_PAGES}-page extraction limit."
+        )
     chunks: list[ExtractedChunk] = []
     total = 0
     for page_number, page in enumerate(reader.pages, 1):
@@ -150,12 +246,30 @@ def _extract_pdf(payload: bytes) -> ExtractedDocument:
         total += len(page_text)
         if total > MAX_EXTRACTED_CHARS:
             raise DocumentIngestionError("Extracted document text exceeds the safety limit.")
-        chunks.extend(_chunks_from_text(f"Page {page_number}", page_text, len(chunks) + 1))
+        chunks.extend(
+            _chunks_from_text(
+                f"Page {page_number}",
+                page_text,
+                len(chunks) + 1,
+            )
+        )
     if not chunks:
         raise DocumentIngestionError(
             "No readable PDF text was found. A local OCR/vision fallback will be required for this document."
         )
     return ExtractedDocument(".pdf", chunks, page_count=len(reader.pages))
+
+
+def _extract_pdf(payload: bytes) -> ExtractedDocument:
+    if not payload.startswith(b"%PDF-"):
+        raise DocumentIngestionError("The file does not have a valid PDF signature.")
+    try:
+        return _extract_pdf_with_pymupdf(payload)
+    except DocumentIngestionError:
+        raise
+    except Exception:
+        # Conservative fallback retained for PDFs that PyMuPDF cannot parse.
+        return _extract_pdf_with_pypdf(payload)
 
 
 def _extract_docx(payload: bytes) -> ExtractedDocument:
