@@ -3,7 +3,12 @@ from __future__ import annotations
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 
 from packbridge.services import runtime_settings
-from packbridge.services.template_store import TemplateInstallError, active_template, install_template
+from packbridge.services.template_store import (
+    TemplateInstallError,
+    active_template,
+    clean_active_template,
+    install_template,
+)
 
 bp = Blueprint("settings", __name__, url_prefix="/settings")
 
@@ -77,4 +82,20 @@ def template_upload():
         )
     except (TemplateInstallError, OSError, ValueError) as exc:
         flash(f"SSD template rejected: {exc}", "danger")
+    return redirect(url_for("settings.index"))
+
+
+@bp.post("/template/clean")
+def template_clean():
+    try:
+        template = clean_active_template(current_app.config["TEMPLATE_ROOT"])
+        inspection = template["inspection"]
+        if not inspection.get("generation_ready"):
+            raise TemplateInstallError("Cleaned template did not become generation-ready.")
+        flash(
+            "Created and activated a clean generation template while preserving the workbook structure and VBA.",
+            "success",
+        )
+    except (TemplateInstallError, OSError, ValueError) as exc:
+        flash(f"Could not create clean SSD template: {exc}", "danger")
     return redirect(url_for("settings.index"))
