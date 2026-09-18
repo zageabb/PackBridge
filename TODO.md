@@ -14,59 +14,59 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Document deterministic SSD-generation boundary.
 - [ ] Verify the exact SSD workbook structure and create the canonical → SSD mapping specification.
 - [ ] Confirm whether generated XLSX without macros is accepted by the SAP import process.
-- [ ] Decide initial supported source file types for v0.1.
-- [ ] Select initial Ollama model for baseline testing.
+- [x] Decide initial supported source file types for v0.1.
+- [x] Select initial Ollama model for baseline testing.
 - [ ] Define initial acceptance criteria and benchmark documents.
 
 ## Phase 1 — Application shell
 
-- [ ] Create Flask application skeleton.
-- [ ] Add configuration management and `.env.example`.
+- [x] Create Flask application skeleton.
+- [x] Add configuration management and `.env.example`.
 - [ ] Add SQLite database initialisation/migrations.
-- [ ] Create job/workspace model.
-- [ ] Create file-storage layout for source, working artefacts and outputs.
+- [x] Create job/workspace model.
+- [x] Create file-storage layout for source, working artefacts and outputs.
 - [ ] Add basic top navigation: Jobs / Knowledge / Settings.
-- [ ] Build two-panel responsive workspace.
+- [x] Build two-panel responsive workspace.
 - [ ] Make assistant panel collapsible/resizable.
-- [ ] Add diagnostics page for Ollama connection/model status.
+- [x] Add diagnostics page for Ollama connection/model status.
 
 ## Phase 2 — Upload and document ingestion
 
 - [ ] Add drag/drop and file-picker upload.
-- [ ] Store original source file unchanged.
-- [ ] Implement digital PDF text extraction.
+- [x] Store original source file unchanged.
+- [x] Implement digital PDF text extraction.
 - [ ] Implement PDF page rendering for source verification.
 - [ ] Implement table/row extraction strategy.
-- [ ] Add DOCX source extraction.
-- [ ] Add XLSX/XLSM source extraction where needed.
+- [x] Add DOCX source extraction.
+- [x] Add XLSX/XLSM source extraction where needed.
 - [ ] Add optional local OCR/vision path for scanned documents.
-- [ ] Store page/section/table evidence metadata.
+- [x] Store page/section/table evidence metadata.
 - [ ] Show visible processing progress steps.
 
 ## Phase 3 — Canonical schema and mapper
 
-- [ ] Implement canonical PackingList model.
-- [ ] Implement provenance-aware field values: source vs working.
-- [ ] Implement package/case model.
-- [ ] Implement item model.
-- [ ] Implement issues/status model.
-- [ ] Load canonical schema from Knowledge.
-- [ ] Build generic Ollama mapper service.
-- [ ] Require structured JSON output.
-- [ ] Enforce null for absent values.
-- [ ] Capture source evidence.
-- [ ] Support package continuation across pages.
+- [x] Implement canonical PackingList model.
+- [x] Implement provenance-aware field values: source vs working.
+- [x] Implement package/case model.
+- [x] Implement item model.
+- [x] Implement issues/status model.
+- [x] Load canonical schema from Knowledge.
+- [x] Build generic Ollama mapper service.
+- [x] Require structured JSON output.
+- [x] Enforce null for absent values.
+- [x] Capture source evidence.
+- [x] Support package continuation across pages.
 - [ ] Add staged/chunked processing for large documents.
 - [ ] Preserve manual edits on safe reprocessing or explicitly warn before overwrite.
 
 ## Phase 4 — Knowledge loader and profiles
 
-- [ ] Load `knowledge/system/*.md`.
-- [ ] Load vendor/document-profile Markdown.
+- [x] Load `knowledge/system/*.md`.
+- [x] Load vendor/document-profile Markdown.
 - [ ] Add profile matching using deterministic document indicators.
 - [ ] Add document-profile/version metadata.
 - [ ] Parse/validate structured YAML/JSON rule blocks.
-- [ ] Select only relevant knowledge for each prompt.
+- [x] Select only relevant knowledge for each prompt.
 - [ ] Support approved few-shot examples.
 - [ ] Add Knowledge browser/editor.
 - [ ] Add validation before activating changed knowledge.
@@ -74,18 +74,18 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 ## Phase 5 — Virtual SSD
 
-- [ ] Create Summary tab.
-- [ ] Create case tabs / searchable case selector.
+- [x] Create Summary tab.
+- [x] Create case tabs / searchable case selector.
 - [ ] Create editable SSD-style field layout.
 - [ ] Create editable item grid.
-- [ ] Add origin indicators: source / modified / calculated / project-default / issue.
+- [x] Add origin indicators: source / modified / calculated / project-default / issue.
 - [ ] Show original/source value for modified fields.
 - [ ] Add field-level revert.
 - [ ] Add case-level revert.
 - [ ] Add job-level revert.
 - [ ] Add Previous/Next case navigation.
 - [ ] Add Issues tab.
-- [ ] Add Source tab.
+- [x] Add Source tab.
 - [ ] Add Output Preview tab.
 - [ ] Add source-verification popup with source page next to Virtual SSD data.
 
@@ -93,27 +93,27 @@ This is the working implementation backlog. Keep it updated as features are comp
 
 - [ ] Implement gross >= net weight rule with override support.
 - [ ] Validate dimensions and units.
-- [ ] Validate package identifiers and duplicates.
+- [x] Validate package identifiers and duplicates.
 - [ ] Validate continuation-page grouping.
-- [ ] Validate item quantities/UOMs.
+- [x] Validate item quantities/UOMs.
 - [ ] Validate required SSD fields.
-- [ ] Add INFO/WARNING/BLOCKING severities.
+- [x] Add INFO/WARNING/BLOCKING severities.
 - [ ] Revalidate immediately after working-data edits.
 - [ ] Add warning acknowledgement/override audit where appropriate.
 - [ ] Prevent normal generation while unresolved blocking issues remain.
 
 ## Phase 7 — Context-aware assistant
 
-- [ ] Add job-scoped chat.
-- [ ] Pass selected case/field as assistant context.
+- [x] Add job-scoped chat.
+- [x] Pass selected case/field as assistant context.
 - [ ] Allow "where did this come from?" evidence queries.
 - [ ] Explain validation failures.
 - [ ] Answer structured shipment questions through application tools/data.
 - [ ] Add assistant-proposed data changes with Apply/Cancel.
 - [ ] Add assistant-generated clarification questions during processing.
-- [ ] Persist job chat.
+- [x] Persist job chat.
 - [ ] Add reprocess field/case actions.
-- [ ] Ensure the assistant cannot directly mutate the SSD workbook.
+- [x] Ensure the assistant cannot directly mutate the SSD workbook.
 
 ## Phase 8 — Learning
 
@@ -162,7 +162,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [ ] Add expected canonical JSON for each test document.
 - [ ] Add continuation-page regression tests.
 - [ ] Add source-vs-working edit tests.
-- [ ] Add validation tests.
+- [x] Add validation tests.
 - [ ] Add SSD structure regression tests.
 - [ ] Benchmark 14B baseline.
 - [ ] Benchmark 7B candidate against same tests.
