@@ -867,6 +867,10 @@ def chat(job_id: int):
     if job.working_json:
         try:
             packing_model = load_packing(job.working_json)
+            apply_acknowledgements(
+                packing_model,
+                active_acknowledgements(job.id),
+            )
         except ValueError:
             packing_model = None
 
