@@ -93,7 +93,10 @@
     const locator = sourceJump.dataset.locator || "";
     if (!locator) return;
     const target = Array.from(document.querySelectorAll("[data-source-locator]"))
-      .find((node) => node.dataset.sourceLocator === locator);
+      .find((node) => {
+        const candidate = node.dataset.sourceLocator || "";
+        return candidate === locator || candidate.startsWith(locator + ",") || locator.startsWith(candidate + ",");
+      });
     editor.close();
     if (target) {
       target.scrollIntoView({behavior: "smooth", block: "center"});
