@@ -96,7 +96,7 @@
           <button class="btn btn-secondary" type="button" data-revert-job>Revert all edits</button>
         {% endif %}
         {% if job.status in ["extracted", "mapping_failed"] %}
-        <form method="post" action="{{ url_for('jobs.process', job_id=job.id) }}" class="process-form">
+        <form method="post" action="{{ url_for('jobs.process', job_id=job.id) }}" class="process-form" id="process-form">
           <input type="text" name="profile_hint" placeholder="Optional vendor/profile hint">
           <button class="btn btn-primary" type="submit">Run Local Mapper</button>
         </form>
@@ -110,6 +110,19 @@
       <span>{{ job.error_message }}</span>
     </div>
     {% endif %}
+
+    <section class="processing-progress" id="processing-progress" hidden>
+      <div class="processing-progress-header">
+        <div>
+          <div class="eyebrow">LOCAL PROCESSING</div>
+          <strong id="processing-progress-title">Preparing document mapper…</strong>
+        </div>
+        <span class="local-pill">qwen3:14b baseline</span>
+      </div>
+      <div class="processing-progress-bar"><span id="processing-progress-bar"></span></div>
+      <div class="processing-progress-events" id="processing-progress-events"></div>
+      <p class="muted">This runs entirely through the configured local Ollama service. You can leave the assistant panel open while processing.</p>
+    </section>
 
     {% if packing %}
       <div class="workspace-tabs">
