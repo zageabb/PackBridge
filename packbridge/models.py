@@ -154,3 +154,34 @@ class SSDProjectJob(db.Model):
     added_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
 
     job = db.relationship("Job", backref=db.backref("ssd_project_link", uselist=False))
+
+
+class SSDOutputRecord(db.Model):
+    __tablename__ = "ssd_output_records"
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(
+        db.Integer,
+        db.ForeignKey("ssd_projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    output_type = db.Column(db.String(40), nullable=False, default="validation")
+    filename = db.Column(db.String(255), nullable=False)
+    path = db.Column(db.Text, nullable=False)
+    sha256 = db.Column(db.String(64), nullable=False)
+    template_sha256 = db.Column(db.String(64), nullable=False)
+    structural_fingerprint = db.Column(db.String(64), nullable=False)
+    rows_written = db.Column(db.Integer, nullable=False, default=0)
+    cells_written = db.Column(db.Integer, nullable=False, default=0)
+    status = db.Column(db.String(40), nullable=False, default="verified")
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+    project = db.relationship(
+        "SSDProject",
+        backref=db.backref(
+            "outputs",
+            cascade="all, delete-orphan",
+            order_by="SSDOutputRecord.created_at.desc()",
+        ),
+    )
