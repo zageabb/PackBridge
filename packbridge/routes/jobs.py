@@ -253,6 +253,15 @@ def view(job_id: int):
                 profile_document.relative_to(Path(current_app.config["KNOWLEDGE_ROOT"]).resolve())
             )
 
+    learning_recommended = bool(
+        packing
+        and not profile_knowledge_path
+        and AuditEvent.query.filter_by(
+            job_id=job.id,
+            event_type="profile_not_matched",
+        ).first()
+    )
+
     return render_template(
         "job.html",
         job=job,
@@ -266,6 +275,7 @@ def view(job_id: int):
         ssd_context=ssd_context,
         ssd_preview=ssd_preview,
         profile_knowledge_path=profile_knowledge_path,
+        learning_recommended=learning_recommended,
         selected_ssd_override=(
             ssd_context.case_overrides.get(
                 str((((selected or {}).get("case_number") or {}).get("working") or {}).get("value") or "")
