@@ -457,6 +457,7 @@ def update_ssd_context(job_id: int):
         "supplier_name",
         "pickup_address",
         "supplier_contact",
+        "supplier_phone_email",
         "preliminary_final",
         "bu_details",
         "project_name",
