@@ -30,6 +30,10 @@ from packbridge.models import (
     KnowledgeProposalRecord,
 )
 from packbridge.services.assistant_context import build_assistant_context
+from packbridge.services.assistant_data import (
+    execute_data_queries,
+    format_data_results,
+)
 from packbridge.services.document_ingestion import (
     ALLOWED_EXTENSIONS,
     DocumentIngestionError,
@@ -1194,12 +1198,29 @@ def chat(job_id: int):
     )
 
     proposal_changes = []
+    data_results = []
     if structured.available:
         reply = structured.value
         answer = reply.message
         if reply.clarification_question:
             answer += "\n\n" + reply.clarification_question
         proposal_changes = _validate_assistant_changes(job, reply.proposed_changes)
+
+        if reply.data_queries:
+            if packing_model is None:
+                answer += "\n\nNo mapped working dataset is available for that data question."
+            else:
+                data_results = execute_data_queries(
+                    packing_model,
+                    reply.data_queries,
+                )
+                deterministic_answer = format_data_results(data_results)
+                if deterministic_answer:
+                    answer = (
+                        (answer.strip() + "\n\n")
+                        if answer.strip()
+                        else ""
+                    ) + deterministic_answer
     else:
         fallback = client.chat(history, system_prompt=system_prompt)
         answer = (
@@ -1236,6 +1257,11 @@ def chat(job_id: int):
             "context": context,
             "proposal_id": proposal.id if proposal else None,
             "proposed_change_count": len(proposal_changes),
+            "data_query_count": len(data_results),
+            "data_query_operations": [
+                result.get("operation")
+                for result in data_results
+            ],
         },
     )
     db.session.commit()
