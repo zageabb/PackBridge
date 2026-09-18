@@ -46,6 +46,7 @@
     data-source="{{ field.source.value if field and field.source and field.source.value is not none else '' }}"
     data-source-unit="{{ field.source.unit if field and field.source and field.source.unit else '' }}"
     data-locator="{{ field.source.evidence[0].locator if field and field.source and field.source.evidence else '' }}"
+    data-raw="{{ field.source.raw if field and field.source and field.source.raw else '' }}"
     title="Edit {{ label }}"
   >✎</button>
 </div>
@@ -65,6 +66,7 @@
     data-source="{{ field.source.value if field and field.source and field.source.value is not none else '' }}"
     data-source-unit="{{ field.source.unit if field and field.source and field.source.unit else '' }}"
     data-locator="{{ field.source.evidence[0].locator if field and field.source and field.source.evidence else '' }}"
+    data-raw="{{ field.source.raw if field and field.source and field.source.raw else '' }}"
     title="Edit value"
   >✎</button>
 </div>
@@ -287,7 +289,7 @@
             <summary>{{ document.original_name }} · {{ document.page_count or "?" }} page(s)</summary>
             <div class="source-chunks">
               {% for chunk in document.chunks[:30] %}
-              <article id="source-chunk-{{ chunk.id }}">
+              <article id="source-chunk-{{ chunk.id }}" data-source-locator="{{ chunk.locator }}">
                 <strong>{{ chunk.locator }}</strong>
                 <pre>{{ chunk.text }}</pre>
               </article>
@@ -423,6 +425,8 @@
       <span>Original source value</span>
       <strong id="field-editor-source">—</strong>
       <small id="field-editor-locator"></small>
+      <pre id="field-editor-raw" hidden></pre>
+      <button type="button" class="source-jump" id="field-editor-source-jump" hidden>View source section</button>
     </div>
     <div class="field-editor-error" id="field-editor-error" hidden></div>
     <div class="field-editor-actions">
