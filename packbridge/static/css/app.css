@@ -1125,3 +1125,34 @@ body.resizing-assistant {
   background: #f4f8fd;
   transition: outline .2s ease, background .2s ease;
 }
+
+
+/* Validation acknowledgement */
+.issue-chip.acknowledged {
+  color: #5c6672;
+  background: #eef1f4;
+}
+.issue-item {
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: start;
+}
+.issue-item.resolved {
+  border-left-color: #8b96a3;
+  background: #f8fafb;
+  opacity: .82;
+}
+.issue-item.resolved .issue-severity {
+  color: #667382;
+}
+.issue-item-body {
+  min-width: 0;
+}
+.issue-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.btn-small {
+  padding: 6px 9px;
+  font-size: 11px;
+}
