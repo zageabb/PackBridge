@@ -2,9 +2,9 @@
 
 ## Current state
 
-PackBridge has moved from design into the first implementation slice.
+PackBridge is now in active application development. The repository contains a runnable Flask/Python application and the second development slice has been implemented.
 
-The repository now contains a runnable Flask application skeleton plus the first reusable infrastructure adapted from existing applications.
+The selected local deployment port is **5085**.
 
 ## Implemented
 
@@ -14,26 +14,28 @@ The repository now contains a runnable Flask application skeleton plus the first
 - SQLite/SQLAlchemy operational models
 - job/source/chat/audit records
 - managed source/working/output storage layout
-- local CSS/HTML application shell
+- Jobs / Knowledge / Settings navigation
 - responsive two-panel job workspace
-- collapsible right-hand local assistant
+- collapsible and resizable right-hand local assistant
 - Ollama settings/model discovery
 - health/readiness endpoints
 
 ### Document ingestion
 
+- drag/drop and file-picker upload
+- retained original source file with SHA-256
 - PDF text extraction with page locators
 - DOCX paragraph/heading/table extraction
 - XLSX/XLSM worksheet extraction
 - CSV/TXT/Markdown support
 - file signature/Office container safety checks
 - extraction size limits
-- original-file SHA-256 and retained source copy
+- stored source section locators
 
 ### Generic mapping
 
 - local Ollama typed JSON client
-- baseline model qwen3:14b
+- baseline model `qwen3:14b`
 - generic packing-list mapping prompt
 - vendor/document Knowledge context
 - canonical source/working value model
@@ -41,10 +43,11 @@ The repository now contains a runnable Flask application skeleton plus the first
 - package and item structures
 - continuation-page instruction
 - deterministic post-mapping validation
+- deterministic Knowledge-profile matching before mapping
 
 ### Knowledge
 
-Initial document-driven Knowledge now includes:
+Initial document-driven Knowledge includes:
 
 - canonical schema
 - generic packing-list mapping rules
@@ -52,64 +55,123 @@ Initial document-driven Knowledge now includes:
 - SSD output safety rules
 - initial Hitachi Energy QBANK reference profile
 
-The HE profile is guidance to the generic mapper, not a separate parser.
+The HE profile remains guidance to the generic mapper, not a separate parser.
 
-### Virtual SSD first slice
+A read-only Knowledge browser and search page are now available. Governed Knowledge editing/approval is still pending.
+
+### Virtual SSD
+
+The Virtual SSD is now an editable working-data layer rather than display-only.
+
+Implemented:
 
 - shipment/package summary
-- case selection
+- case tabs / selection
+- Previous / Next case navigation
 - package details
 - dimensions/weights
-- line-item display
-- provenance indicator framework
-- source extraction view
-- final SSD button intentionally disabled until the mapping is verified
+- editable item grid
+- source / working value separation
+- modified-value indicators
+- original source value shown for modified fields
+- field-level revert
+- case-level revert
+- whole-job revert
+- immediate deterministic revalidation after edits
+- Issues section with INFO / WARNING / BLOCKING counts
+- Source section
+- audit timeline
 
-### Assistant first slice
+The source evidence is never overwritten by a user edit.
+
+### Assistant
 
 - job-scoped persistent chat
-- current job data supplied as context
+- current working data supplied as context
 - selected case supplied as context
 - local Ollama only
+- collapsible/resizable panel
+- assistant remains unable to write the final SSD workbook
+
+Assistant Apply/Cancel change proposals are still a later slice.
+
+### Validation
+
+Current deterministic checks include:
+
+- missing/duplicate package identifiers
+- gross/net numeric checks
+- gross below net warning
+- incomplete/invalid dimensions
+- item quantity checks
+- quantity without UOM
+- issue severity counts
+
+Validation runs after initial mapping and after every working-data change/revert.
+
+### Audit
+
+The job workspace now shows an append-oriented audit timeline for:
+
+- uploads
+- extraction
+- profile matching
+- mapping
+- working-field edits
+- field/case/job reverts
+- assistant messages
+
+The mapping event records the local model used.
 
 ### Automated tests
 
-Initial tests cover:
+Tests now cover:
 
 - CSV/XLSX ingestion
 - canonical normalisation
 - deterministic validation
 - Knowledge search
 - Ollama request behaviour
+- working-data edits/reverts
+- deterministic document-profile matching
 
-A GitHub Actions pytest workflow has been added.
+A GitHub Actions pytest workflow exists, but a workflow execution result has not yet been observed through the connected GitHub interface.
+
+## Port
+
+The application default and `.env.example` now use:
+
+```text
+5085
+```
+
+The deployment agent's live port inventory should only be amended once PackBridge is actually deployed and verified on the host.
 
 ## Intentionally not implemented yet
 
-The following are deliberately deferred until the first extraction/mapping loop is exercised against the real reference packing list:
+The following remain deliberately deferred:
 
-- editable Virtual SSD values
-- source-vs-working change/revert UI
-- page-image PDF rendering
-- profile auto-detection
-- assistant Apply/Cancel change proposals
-- Learning/Knowledge amendment workflow
+- PDF page-image rendering / side-by-side source popup
+- local OCR/vision fallback
 - staged mapper for very large documents
+- assistant Apply/Cancel data-change proposals
+- warning override/acknowledgement workflow
+- Learning/Knowledge amendment approvals and versioning
 - final canonical-to-SSD cell/range mapping
 - final SSD generation
-- SAP acceptance validation
-- OCR/vision fallback
+- SAP import acceptance validation
 
 ## Next development slice
 
-1. Run the application on the Ubuntu host.
-2. Upload the reference HE packing list.
-3. Run qwen3:14b through the generic mapper.
-4. Compare returned package count/values against the known 17-case reference.
-5. Fix mapper/chunking/schema issues found by the real document.
-6. Add editable working values and validation issue UI.
-7. Inspect the SSD workbook formally and document its exact mapping before enabling generation.
+1. Deploy/run PackBridge on port 5085.
+2. Upload the real reference HE packing list.
+3. Run `qwen3:14b` through the generic mapper.
+4. Compare the result against the expected 17-case reference and continuation-page behaviour.
+5. Fix any real-document extraction/mapping issues.
+6. Add source-verification navigation/popups and clarification handling.
+7. Add assistant proposed changes with explicit Apply/Cancel.
+8. Formally inspect the SSD workbook and define the deterministic output mapping before enabling generation.
 
 ## Current design constraint
 
-Do not implement the final SSD writer based on assumptions from the design discussion. The workbook is SAP-sensitive and must be inspected and regression-tested before its mapping rules become active.
+Do not implement the final SSD writer from assumptions. The workbook is SAP-sensitive and must be inspected, mapped and regression-tested before the output path becomes active.
