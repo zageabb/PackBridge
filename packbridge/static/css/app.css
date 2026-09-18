@@ -824,3 +824,91 @@ body.resizing-assistant {
   display: flex;
   justify-content: flex-end;
 }
+
+
+/* SSD project aggregation workspace */
+.projects-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, .7fr) minmax(0, 1.3fr);
+  gap: 22px;
+  align-items: start;
+}
+.project-list {
+  display: grid;
+  gap: 8px;
+}
+.project-list > a {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 12px 13px;
+  color: var(--text);
+}
+.project-list > a:hover {
+  text-decoration: none;
+  border-color: var(--accent-2);
+  background: #fafbfd;
+}
+.project-list > a > div:first-child,
+.project-list-meta {
+  display: grid;
+  gap: 3px;
+}
+.project-list span,
+.project-list small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.project-list-meta {
+  text-align: right;
+  white-space: nowrap;
+}
+.project-heading {
+  align-items: center;
+}
+.attach-job-form {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  gap: 9px;
+  margin-top: 14px;
+}
+.btn-small {
+  padding: 6px 9px;
+  font-size: 11px;
+}
+.project-generation-bar {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 11px 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  background: #fafbfd;
+}
+.project-generation-bar > div {
+  display: grid;
+  gap: 2px;
+}
+.project-generation-bar span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .projects-layout {
+    grid-template-columns: 1fr;
+  }
+  .attach-job-form {
+    grid-template-columns: 1fr;
+  }
+  .project-heading,
+  .project-generation-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
