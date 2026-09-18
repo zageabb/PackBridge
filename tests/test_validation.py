@@ -70,3 +70,48 @@ def test_quantity_without_uom_is_reported():
     validate_packing_list(packing)
 
     assert "ITEM_UOM_MISSING" in issue_codes(packing)
+
+
+
+def test_missing_and_unknown_units_are_reported():
+    packing = PackingList(
+        packages=[
+            Package(
+                case_number=field("C-UNIT"),
+                gross_weight=field(100),
+                net_weight=field(90, "STONE"),
+            )
+        ]
+    )
+    packing.packages[0].dimensions.length = field(10)
+    packing.packages[0].dimensions.width = field(20)
+    packing.packages[0].dimensions.height = field(30)
+    packing.packages[0].dimensions.unit = "CM"
+
+    validate_packing_list(packing)
+
+    codes = issue_codes(packing)
+    assert "GROSS_WEIGHT_UNIT_MISSING" in codes
+    assert "NET_WEIGHT_UNIT_UNKNOWN" in codes
+    assert "DIMENSION_UNIT_MISSING" not in codes
+
+
+def test_supported_units_do_not_raise_unit_warnings():
+    packing = PackingList(
+        packages=[
+            Package(
+                case_number=field("C-OK"),
+                gross_weight=field(100, "KG"),
+                net_weight=field(90, "KG"),
+            )
+        ]
+    )
+    packing.packages[0].dimensions.length = field(100, "MM")
+    packing.packages[0].dimensions.width = field(200, "MM")
+    packing.packages[0].dimensions.height = field(300, "MM")
+
+    validate_packing_list(packing)
+
+    codes = issue_codes(packing)
+    assert not any(code.endswith("_UNIT_MISSING") for code in codes)
+    assert not any(code.endswith("_UNIT_UNKNOWN") for code in codes)
