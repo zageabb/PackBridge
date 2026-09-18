@@ -70,8 +70,10 @@
       <h2>Controlled SSD template</h2>
       <p>Templates are versioned by SHA-256 and accepted only when the expected SoCs / Packing List / Marking Label structure is present.</p>
     </div>
-    {% if template and template.available and template.inspection.compatible %}
-      <span class="status status-mapped">Verified</span>
+    {% if template and template.available and template.inspection.generation_ready %}
+      <span class="status status-mapped">Generation ready</span>
+    {% elif template and template.available and template.inspection.compatible %}
+      <span class="status status-processing">Structure verified</span>
     {% else %}
       <span class="status status-failed">Not installed</span>
     {% endif %}
@@ -99,6 +101,8 @@
           <div><dt>VBA project</dt><dd>{{ "Present" if inspection.has_vba else "Not present" }}</dd></div>
           <div><dt>Worksheets</dt><dd>{{ inspection.sheet_count }}</dd></div>
           <div><dt>Generated PL / ML</dt><dd>{{ inspection.generated_pl_count }} / {{ inspection.generated_ml_count }}</dd></div>
+          <div><dt>Existing SoCs cases</dt><dd>{{ inspection.existing_case_count }}</dd></div>
+          <div><dt>Generation ready</dt><dd>{{ "Yes" if inspection.generation_ready else "No" }}</dd></div>
           <div><dt>Structure fingerprint</dt><dd><code>{{ inspection.structural_fingerprint[:16] }}…</code></dd></div>
           <div><dt>File SHA-256</dt><dd><code>{{ inspection.sha256[:16] }}…</code></dd></div>
         </dl>
