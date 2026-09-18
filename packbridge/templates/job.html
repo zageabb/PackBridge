@@ -656,6 +656,24 @@
     </div>
   </form>
 </dialog>
+
+<dialog class="source-evidence-dialog" id="source-evidence-dialog">
+  <div class="source-evidence-dialog-shell">
+    <div class="field-editor-header">
+      <div>
+        <div class="eyebrow">SOURCE EVIDENCE</div>
+        <h3 id="source-evidence-title">Source section</h3>
+        <p id="source-evidence-subtitle"></p>
+      </div>
+      <button type="button" class="icon-btn" data-close-source-evidence>×</button>
+    </div>
+    <div class="source-evidence-results" id="source-evidence-results"></div>
+    <div class="source-evidence-actions">
+      <button type="button" class="btn btn-secondary" data-close-source-evidence>Close</button>
+      <a class="btn btn-primary" id="source-evidence-jump" href="#source">Open Source tab</a>
+    </div>
+  </div>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
