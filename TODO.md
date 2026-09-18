@@ -36,7 +36,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Store original source file unchanged.
 - [x] Implement digital PDF text extraction.
 - [x] Implement PDF page rendering for source verification.
-- [ ] Implement table/row extraction strategy.
+- [x] Implement table/row extraction strategy.
 - [x] Add DOCX source extraction.
 - [x] Add XLSX/XLSM source extraction where needed.
 - [ ] Add optional local OCR/vision path for scanned documents.
@@ -65,11 +65,11 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Load vendor/document-profile Markdown.
 - [x] Add profile matching using deterministic document indicators.
 - [x] Add document-profile/version metadata.
-- [ ] Parse/validate structured YAML/JSON rule blocks.
+- [x] Parse/validate structured YAML/JSON rule blocks.
 - [x] Select only relevant knowledge for each prompt.
-- [ ] Support approved few-shot examples.
+- [x] Support approved few-shot examples. *(approved learned examples live inside the active profile and are explicitly injected into mapper context)*
 - [x] Add Knowledge browser/editor. *(governed proposal/approval editing implemented)*
-- [ ] Add validation before activating changed knowledge. *(Markdown safety/content validation implemented; structured YAML/JSON rule validation still pending)*
+- [x] Add validation before activating changed knowledge.
 - [x] Add import/export/replace workflow for remote support.
 
 ## Phase 5 — Virtual SSD
@@ -127,7 +127,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Allow explicit "apply to profile" approval. *(corrected fields can create a profile-learning proposal; Knowledge approval is separate)*
 - [x] Version Knowledge profile changes.
 - [x] Keep knowledge change audit history.
-- [ ] Generate profile/examples from an approved new-document learning session.
+- [x] Generate profile/examples from an approved new-document learning session. *(unrecognised jobs can draft a review-only local-AI profile proposal)*
 - [x] Add compare/diff view before approving Knowledge changes.
 
 ## Phase 9 — SSD generator
