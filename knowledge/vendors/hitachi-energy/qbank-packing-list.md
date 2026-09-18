@@ -1,5 +1,7 @@
 # Hitachi Energy — QBANK Packing List Profile
 
+Version: 1
+
 ## Profile status
 
 Initial reference profile for the PackBridge proof of concept.
