@@ -62,7 +62,14 @@ def apply_proposal(
     if proposal.status != "pending":
         raise KnowledgeGovernanceError(f"Proposal is already {proposal.status}.")
 
-    path, current, current_hash = current_content(root, proposal.target_path)
+    path = safe_knowledge_path(root, proposal.target_path, must_exist=False)
+    if path.exists():
+        current = path.read_text(encoding="utf-8")
+        current_hash = sha256_text(current)
+    else:
+        current = ""
+        current_hash = sha256_text("")
+
     if current_hash != proposal.base_sha256:
         raise KnowledgeGovernanceError(
             "Knowledge document changed after this proposal was created. Review and create a fresh proposal."
