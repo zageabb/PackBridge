@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}PackBridge — Knowledge{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <div class="eyebrow">KNOWLEDGE</div>
+    <h1>Mapping guidance</h1>
+    <p>Human-readable system and vendor/document-profile guidance used by the local mapper.</p>
+  </div>
+</section>
+
+<div class="knowledge-layout">
+  <aside class="card knowledge-index">
+    <form method="get" action="{{ url_for('knowledge.index') }}" class="knowledge-search">
+      <input type="search" name="q" value="{{ query }}" placeholder="Search Knowledge">
+      <button class="btn btn-secondary" type="submit">Search</button>
+    </form>
+    {% if query %}
+      <a class="knowledge-clear" href="{{ url_for('knowledge.index') }}">Clear search</a>
+    {% endif %}
+    <div class="knowledge-documents">
+      {% for document in documents %}
+      <a
+        class="{% if selected and selected.path == document.path %}selected{% endif %}"
+        href="{{ url_for('knowledge.index', path=document.path, q=query or none) }}"
+      >
+        <strong>{{ document.title }}</strong>
+        <span>{{ document.path }}</span>
+        {% if document.score is not none %}<small>match {{ document.score }}</small>{% endif %}
+      </a>
+      {% else %}
+      <div class="empty-state compact-empty">No Knowledge documents matched.</div>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <section class="card knowledge-viewer">
+    {% if selected %}
+      <div class="section-heading">
+        <div>
+          <h2>{{ selected.path }}</h2>
+          <p>Read-only in the current development slice. Knowledge approval/editing comes later.</p>
+        </div>
+      </div>
+      <pre>{{ selected.content }}</pre>
+    {% else %}
+      <div class="empty-state">
+        <strong>No Knowledge document selected.</strong>
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
