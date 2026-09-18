@@ -10,6 +10,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     url_for,
 )
 
@@ -24,6 +25,7 @@ from packbridge.services.knowledge_governance import (
     reject_proposal,
     safe_knowledge_path,
     sha256_text,
+    validate_knowledge_content,
 )
 
 bp = Blueprint("knowledge", __name__, url_prefix="/knowledge")
@@ -144,8 +146,7 @@ def propose_edit():
 
     try:
         _, current, base_hash = current_content(root, target_path)
-        if not proposed_content.strip():
-            raise KnowledgeGovernanceError("Proposed Knowledge content cannot be blank.")
+        proposed_content = validate_knowledge_content(proposed_content)
         if proposed_content == current:
             raise KnowledgeGovernanceError("No Knowledge changes were proposed.")
         proposal = KnowledgeProposalRecord(
@@ -189,8 +190,7 @@ def propose_new():
         path = safe_knowledge_path(root, target_path, must_exist=False)
         if path.exists():
             raise KnowledgeGovernanceError("A Knowledge document already exists at that path.")
-        if not proposed_content.strip():
-            raise KnowledgeGovernanceError("New Knowledge content cannot be blank.")
+        proposed_content = validate_knowledge_content(proposed_content)
 
         proposal = KnowledgeProposalRecord(
             job_id=job_id,
@@ -217,6 +217,79 @@ def propose_new():
         flash(str(exc), "danger")
 
     return redirect(url_for("knowledge.index"))
+
+
+@bp.get("/download")
+def download():
+    root = _root()
+    target_path = str(request.args.get("path") or "").strip()
+    path = _safe_document(root, target_path)
+    return send_file(
+        path,
+        as_attachment=True,
+        download_name=path.name,
+        mimetype="text/markdown",
+    )
+
+
+@bp.post("/proposals/import")
+def propose_import():
+    root = _root()
+    target_path = str(request.form.get("target_path") or "").strip()
+    summary = str(request.form.get("summary") or "").strip()
+    reason = str(request.form.get("reason") or "").strip()
+    job_id_raw = str(request.form.get("job_id") or "").strip()
+    job_id = int(job_id_raw) if job_id_raw.isdigit() else None
+    upload = request.files.get("knowledge_file")
+
+    try:
+        if upload is None or not upload.filename:
+            raise KnowledgeGovernanceError("Choose an updated Markdown Knowledge document.")
+        if not upload.filename.casefold().endswith(".md"):
+            raise KnowledgeGovernanceError("Knowledge imports must be Markdown (.md) files.")
+
+        payload = upload.stream.read(600_000)
+        if upload.stream.read(1):
+            raise KnowledgeGovernanceError("Knowledge import exceeds the safety limit.")
+        try:
+            proposed_content = payload.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise KnowledgeGovernanceError("Knowledge imports must use UTF-8 text encoding.") from exc
+
+        proposed_content = validate_knowledge_content(proposed_content)
+        _, current, base_hash = current_content(root, target_path)
+        if proposed_content == current:
+            raise KnowledgeGovernanceError("The imported Knowledge file is identical to the active document.")
+
+        proposal = KnowledgeProposalRecord(
+            job_id=job_id,
+            target_path=target_path,
+            base_sha256=base_hash,
+            proposed_content=proposed_content,
+            summary=summary or f"Import updated {target_path}",
+            reason=reason or None,
+            created_by="user",
+            status="pending",
+        )
+        db.session.add(proposal)
+        db.session.flush()
+        _audit_job(
+            job_id,
+            "knowledge_import_proposed",
+            f"Imported proposed Knowledge replacement for {target_path}",
+            {
+                "proposal_id": proposal.id,
+                "target_path": target_path,
+                "filename": upload.filename,
+            },
+        )
+        db.session.commit()
+        flash("Updated Knowledge file imported as a proposal. Review the diff before approval.", "success")
+    except (KnowledgeGovernanceError, OSError, ValueError) as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+
+    return redirect(url_for("knowledge.index", path=target_path, job=job_id or None))
 
 
 @bp.post("/proposals/<int:proposal_id>/apply")
