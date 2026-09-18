@@ -95,7 +95,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 ## Phase 6 — Validation
 
 - [x] Implement gross >= net weight rule with override support.
-- [ ] Validate dimensions and units.
+- [x] Validate dimensions and units.
 - [x] Validate package identifiers and duplicates.
 - [x] Validate continuation-page grouping.
 - [x] Validate item quantities/UOMs.
