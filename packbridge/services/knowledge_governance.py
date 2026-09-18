@@ -1,0 +1,97 @@
+from __future__ import annotations
+
+import difflib
+import hashlib
+from datetime import datetime, timezone
+from pathlib import Path
+
+from packbridge.models import KnowledgeProposalRecord
+
+
+class KnowledgeGovernanceError(ValueError):
+    pass
+
+
+def sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def safe_knowledge_path(root: Path, relative: str, *, must_exist: bool = True) -> Path:
+    root = root.resolve()
+    relative = str(relative or "").strip().replace("\\", "/")
+    if not relative or relative.startswith("/") or ".." in Path(relative).parts:
+        raise KnowledgeGovernanceError("Invalid Knowledge document path.")
+    if not relative.casefold().endswith(".md"):
+        raise KnowledgeGovernanceError("Knowledge documents must be Markdown files.")
+
+    candidate = (root / relative).resolve()
+    if root != candidate and root not in candidate.parents:
+        raise KnowledgeGovernanceError("Knowledge path is outside the configured Knowledge root.")
+    if must_exist and not candidate.is_file():
+        raise KnowledgeGovernanceError("Knowledge document does not exist.")
+    return candidate
+
+
+def current_content(root: Path, relative: str) -> tuple[Path, str, str]:
+    path = safe_knowledge_path(root, relative, must_exist=True)
+    text = path.read_text(encoding="utf-8")
+    return path, text, sha256_text(text)
+
+
+def proposal_diff(root: Path, proposal: KnowledgeProposalRecord) -> str:
+    try:
+        _, current, _ = current_content(root, proposal.target_path)
+    except (OSError, KnowledgeGovernanceError):
+        current = ""
+    diff = difflib.unified_diff(
+        current.splitlines(),
+        proposal.proposed_content.splitlines(),
+        fromfile=proposal.target_path + " (current)",
+        tofile=proposal.target_path + " (proposed)",
+        lineterm="",
+    )
+    return "\n".join(diff)
+
+
+def apply_proposal(
+    root: Path,
+    proposal: KnowledgeProposalRecord,
+    *,
+    actor: str = "user",
+) -> KnowledgeProposalRecord:
+    if proposal.status != "pending":
+        raise KnowledgeGovernanceError(f"Proposal is already {proposal.status}.")
+
+    path, current, current_hash = current_content(root, proposal.target_path)
+    if current_hash != proposal.base_sha256:
+        raise KnowledgeGovernanceError(
+            "Knowledge document changed after this proposal was created. Review and create a fresh proposal."
+        )
+
+    proposed = proposal.proposed_content
+    if not proposed.strip():
+        raise KnowledgeGovernanceError("A Knowledge document cannot be replaced with blank content.")
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(proposed, encoding="utf-8")
+    temporary.replace(path)
+
+    proposal.status = "applied"
+    proposal.decided_by = actor
+    proposal.decided_at = datetime.now(timezone.utc)
+    proposal.applied_sha256 = sha256_text(proposed)
+    return proposal
+
+
+def reject_proposal(
+    proposal: KnowledgeProposalRecord,
+    *,
+    actor: str = "user",
+) -> KnowledgeProposalRecord:
+    if proposal.status != "pending":
+        raise KnowledgeGovernanceError(f"Proposal is already {proposal.status}.")
+    proposal.status = "rejected"
+    proposal.decided_by = actor
+    proposal.decided_at = datetime.now(timezone.utc)
+    return proposal
