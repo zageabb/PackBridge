@@ -216,5 +216,5 @@ class AssistantProposalRecord(db.Model):
     )
     assistant_message = db.relationship(
         "ChatMessage",
-        backref=db.backref("proposal", uselist=False, cascade="all, delete-orphan"),
+        backref=db.backref("proposal", uselist=False),
     )
