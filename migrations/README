@@ -1,0 +1,5 @@
+Single-database Alembic/Flask-Migrate configuration for PackBridge.
+
+Production startup runs `flask db upgrade` before Gunicorn. Fresh and existing
+SQLite databases can therefore move to the current schema without relying on
+`db.create_all()` for structural changes.
