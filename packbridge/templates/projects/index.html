@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}PackBridge — SSD Projects{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <div class="eyebrow">SSD PROJECTS</div>
+    <h1>Assemble packing lists into one SSD.</h1>
+    <p>A project groups mapped packing-list jobs into the single package dataset required by the controlled SSD workbook.</p>
+  </div>
+</section>
+
+<div class="projects-layout">
+  <section class="card">
+    <div class="section-heading">
+      <div>
+        <h2>New SSD project</h2>
+        <p>Create the shipment/project container before attaching mapped packing lists.</p>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('projects.create') }}" class="form-stack">
+      <label><span>Project name</span><input name="name" required placeholder="e.g. QBANK Project Shipment"></label>
+      <label><span>Reference</span><input name="reference" placeholder="Optional internal/project reference"></label>
+      <label><span>Description</span><textarea name="description" rows="3" placeholder="Optional notes"></textarea></label>
+      <div><button class="btn btn-primary" type="submit">Create SSD project</button></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="section-heading">
+      <div>
+        <h2>Existing projects</h2>
+        <p>Each packing-list job can belong to one SSD project.</p>
+      </div>
+    </div>
+    {% if projects %}
+      <div class="project-list">
+      {% for project in projects %}
+        <a href="{{ url_for('projects.view', project_id=project.id) }}">
+          <div>
+            <strong>{{ project.name }}</strong>
+            <span>{{ project.reference or "No reference" }}</span>
+          </div>
+          <div class="project-list-meta">
+            <span>{{ project.job_links|length }} job(s)</span>
+            <small>{{ project.updated_at.strftime("%d %b %Y %H:%M") }}</small>
+          </div>
+        </a>
+      {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <strong>No SSD projects yet.</strong>
+        <span>Create one when several packing lists belong in the same workbook.</span>
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
