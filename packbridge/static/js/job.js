@@ -258,4 +258,42 @@
       }
     });
   });
+
+  document.querySelectorAll("[data-ack-warning]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const code = button.dataset.code || "warning";
+      const reason = window.prompt(
+        "Acknowledge " + code + ". Add a reason or verification note:",
+        ""
+      );
+      if (reason === null) return;
+      button.disabled = true;
+      try {
+        await postJson("/jobs/" + context.id + "/issues/acknowledge", {
+          fingerprint: button.dataset.fingerprint,
+          reason: reason
+        });
+        window.location.reload();
+      } catch (error) {
+        window.alert(error.message);
+        button.disabled = false;
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-reopen-warning]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!window.confirm("Reopen this acknowledged warning?")) return;
+      button.disabled = true;
+      try {
+        await postJson("/jobs/" + context.id + "/issues/reopen", {
+          fingerprint: button.dataset.fingerprint
+        });
+        window.location.reload();
+      } catch (error) {
+        window.alert(error.message);
+        button.disabled = false;
+      }
+    });
+  });
 })();
