@@ -22,7 +22,7 @@
     </div>
   </div>
   <form action="{{ url_for('jobs.upload') }}" method="post" enctype="multipart/form-data" class="upload-form">
-    <label class="drop-zone" for="packing-list-input">
+    <label class="drop-zone" id="packing-list-drop-zone" for="packing-list-input">
       <span class="drop-icon">⇧</span>
       <strong>Choose a packing list</strong>
       <span>The original file is retained as source evidence.</span>
@@ -82,5 +82,26 @@ document.querySelectorAll(".click-row").forEach((row) => {
     window.location.href = row.dataset.href;
   });
 });
+
+const dropZone = document.getElementById("packing-list-drop-zone");
+const fileInput = document.getElementById("packing-list-input");
+if (dropZone && fileInput) {
+  ["dragenter", "dragover"].forEach((name) => {
+    dropZone.addEventListener(name, (event) => {
+      event.preventDefault();
+      dropZone.classList.add("dragging");
+    });
+  });
+  ["dragleave", "drop"].forEach((name) => {
+    dropZone.addEventListener(name, (event) => {
+      event.preventDefault();
+      dropZone.classList.remove("dragging");
+    });
+  });
+  dropZone.addEventListener("drop", (event) => {
+    if (!event.dataTransfer?.files?.length) return;
+    fileInput.files = event.dataTransfer.files;
+  });
+}
 </script>
 {% endblock %}
