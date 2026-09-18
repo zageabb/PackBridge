@@ -162,7 +162,7 @@
                 <td>{{ value_of(package.dimensions.height) }}</td>
                 <td>{{ value_of(package.gross_weight) }}</td>
                 <td>{{ value_of(package.net_weight) }}</td>
-                <td>{{ package.items|length }}</td>
+                <td>{{ package['items']|length }}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -229,7 +229,7 @@
                 <tr><th>Seq.</th><th>Pos.</th><th>Item</th><th>Description</th><th>Serial</th><th>Qty</th><th>UOM</th></tr>
               </thead>
               <tbody>
-                {% for item in selected_package.items %}
+                {% for item in selected_package['items'] %}
                 {% set item_index = loop.index0 %}
                 <tr>
                   <td>{{ editable_cell(item.sequence, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].sequence", "Sequence") }}</td>
