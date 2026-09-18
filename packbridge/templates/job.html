@@ -87,6 +87,11 @@
       </div>
       <div class="job-actions">
         <span class="status status-{{ job.status|replace('_','-') }}">{{ job.status|replace('_',' ') }}</span>
+        {% if profile_knowledge_path %}
+          <a class="btn btn-secondary" href="{{ url_for('knowledge.index', path=profile_knowledge_path, job=job.id) }}">Learning / profile</a>
+        {% else %}
+          <a class="btn btn-secondary" href="{{ url_for('knowledge.index', job=job.id) }}">Learning</a>
+        {% endif %}
         {% if packing %}
           <button class="btn btn-secondary" type="button" data-revert-job>Revert all edits</button>
         {% endif %}
