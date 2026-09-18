@@ -6,9 +6,18 @@
   {%- if field and field.working -%}{{ field.working.value if field.working.value is not none else "—" }}{%- else -%}—{%- endif -%}
 {%- endmacro %}
 
-{% macro field_row(label, field, suffix="") %}
-<div class="ssd-field {% if field and field.modified %}field-modified{% endif %}">
-  <div class="ssd-field-label">{{ label }}</div>
+{% macro source_value_of(field) -%}
+  {%- if field and field.source -%}{{ field.source.value if field.source.value is not none else "—" }}{%- else -%}—{%- endif -%}
+{%- endmacro %}
+
+{% macro field_row(label, field, path, suffix="") %}
+<div class="ssd-field {% if field and field.modified %}field-modified{% endif %}" data-field-path="{{ path }}">
+  <div class="ssd-field-label">
+    <span>{{ label }}</span>
+    {% if field and field.modified %}
+      <small>Source: {{ source_value_of(field) }}{% if field.source and field.source.unit %} {{ field.source.unit }}{% endif %}</small>
+    {% endif %}
+  </div>
   <div class="ssd-field-value">
     <span>{{ value_of(field) }}</span>
     {% if suffix %}<small>{{ suffix }}</small>{% endif %}
@@ -26,6 +35,38 @@
       <span title="Missing">?</span>
     {% endif %}
   </div>
+  <button
+    class="field-edit-btn"
+    type="button"
+    data-field-edit
+    data-path="{{ path }}"
+    data-label="{{ label }}"
+    data-current="{{ field.working.value if field and field.working and field.working.value is not none else '' }}"
+    data-unit="{{ field.working.unit if field and field.working and field.working.unit else '' }}"
+    data-source="{{ field.source.value if field and field.source and field.source.value is not none else '' }}"
+    data-source-unit="{{ field.source.unit if field and field.source and field.source.unit else '' }}"
+    data-locator="{{ field.source.evidence[0].locator if field and field.source and field.source.evidence else '' }}"
+    title="Edit {{ label }}"
+  >✎</button>
+</div>
+{% endmacro %}
+
+{% macro editable_cell(field, path) %}
+<div class="editable-cell {% if field and field.modified %}field-modified{% endif %}">
+  <span>{{ value_of(field) }}</span>
+  <button
+    type="button"
+    class="cell-edit-btn"
+    data-field-edit
+    data-path="{{ path }}"
+    data-label="{{ path.rsplit('.', 1)[-1]|replace('_', ' ')|title }}"
+    data-current="{{ field.working.value if field and field.working and field.working.value is not none else '' }}"
+    data-unit="{{ field.working.unit if field and field.working and field.working.unit else '' }}"
+    data-source="{{ field.source.value if field and field.source and field.source.value is not none else '' }}"
+    data-source-unit="{{ field.source.unit if field and field.source and field.source.unit else '' }}"
+    data-locator="{{ field.source.evidence[0].locator if field and field.source and field.source.evidence else '' }}"
+    title="Edit value"
+  >✎</button>
 </div>
 {% endmacro %}
 
@@ -44,6 +85,9 @@
       </div>
       <div class="job-actions">
         <span class="status status-{{ job.status|replace('_','-') }}">{{ job.status|replace('_',' ') }}</span>
+        {% if packing %}
+          <button class="btn btn-secondary" type="button" data-revert-job>Revert all edits</button>
+        {% endif %}
         {% if job.status in ["extracted", "mapping_failed"] %}
         <form method="post" action="{{ url_for('jobs.process', job_id=job.id) }}" class="process-form">
           <input type="text" name="profile_hint" placeholder="Optional vendor/profile hint">
@@ -62,22 +106,29 @@
 
     {% if packing %}
       <div class="workspace-tabs">
-        <a class="active" href="{{ url_for('jobs.view', job_id=job.id) }}">Summary</a>
+        <a class="active" href="#summary">Summary</a>
         {% for package in packages[:12] %}
           {% set case_value = package.case_number.working.value if package.case_number and package.case_number.working else "Case" %}
-          <a class="{% if selected_package == package %}case-active{% endif %}" href="{{ url_for('jobs.view', job_id=job.id, case=case_value) }}">{{ case_value }}</a>
+          <a class="{% if selected_package == package %}case-active{% endif %}" href="{{ url_for('jobs.view', job_id=job.id, case=case_value) }}#case-panel">{{ case_value }}</a>
         {% endfor %}
         {% if packages|length > 12 %}
           <span class="tab-more">+{{ packages|length - 12 }}</span>
         {% endif %}
+        <a href="#issues">Issues <span class="tab-count">{{ issue_counts.BLOCKING + issue_counts.WARNING }}</span></a>
         <a href="#source">Source</a>
+        <a href="#audit">Audit</a>
       </div>
 
-      <section class="summary-card">
+      <section class="summary-card" id="summary">
         <div class="section-heading">
           <div>
             <h2>Shipment summary</h2>
-            <p>{{ packages|length }} package(s) mapped by the local model.</p>
+            <p>{{ packages|length }} package(s) in the current working dataset.</p>
+          </div>
+          <div class="issue-chips">
+            {% if issue_counts.BLOCKING %}<span class="issue-chip blocking">{{ issue_counts.BLOCKING }} blocking</span>{% endif %}
+            {% if issue_counts.WARNING %}<span class="issue-chip warning">{{ issue_counts.WARNING }} warning</span>{% endif %}
+            {% if not issue_counts.BLOCKING and not issue_counts.WARNING %}<span class="issue-chip clear">Validation clear</span>{% endif %}
           </div>
         </div>
         <div class="table-wrap">
@@ -97,7 +148,7 @@
               {% for package in packages %}
               {% set case_value = package.case_number.working.value if package.case_number and package.case_number.working else "—" %}
               <tr class="{% if selected_package == package %}selected-row{% endif %}">
-                <td><a href="{{ url_for('jobs.view', job_id=job.id, case=case_value) }}">{{ case_value }}</a></td>
+                <td><a href="{{ url_for('jobs.view', job_id=job.id, case=case_value) }}#case-panel">{{ case_value }}</a></td>
                 <td>{{ value_of(package.dimensions.length) }}</td>
                 <td>{{ value_of(package.dimensions.width) }}</td>
                 <td>{{ value_of(package.dimensions.height) }}</td>
@@ -118,49 +169,68 @@
           <div>
             <div class="eyebrow">CASE</div>
             <h2>{{ selected_case }}</h2>
+            <p>Source values stay intact. Edits only change the working dataset.</p>
           </div>
-          <button class="btn btn-secondary" type="button" disabled title="Editing is the next development slice">Edit values</button>
+          <div class="button-row">
+            {% if selected_package_index is not none and selected_package_index > 0 %}
+              {% set previous = packages[selected_package_index - 1] %}
+              {% set previous_case = previous.case_number.working.value if previous.case_number.working else "Case" %}
+              <a class="btn btn-secondary" href="{{ url_for('jobs.view', job_id=job.id, case=previous_case) }}#case-panel">← Previous</a>
+            {% endif %}
+            {% if selected_package_index is not none and selected_package_index + 1 < packages|length %}
+              {% set next_package = packages[selected_package_index + 1] %}
+              {% set next_case = next_package.case_number.working.value if next_package.case_number.working else "Case" %}
+              <a class="btn btn-secondary" href="{{ url_for('jobs.view', job_id=job.id, case=next_case) }}#case-panel">Next →</a>
+            {% endif %}
+            <button class="btn btn-secondary" type="button" data-revert-package data-package-index="{{ selected_package_index }}">Revert case</button>
+          </div>
         </div>
 
         <div class="ssd-grid">
           <div class="ssd-section">
             <h3>Package</h3>
-            {{ field_row("Case Number", selected_package.case_number) }}
-            {{ field_row("Internal Reference", selected_package.internal_reference) }}
-            {{ field_row("Package Type", selected_package.package_type) }}
-            {{ field_row("Package Description", selected_package.package_description) }}
-            {{ field_row("Status", selected_package.status) }}
-            {{ field_row("Packed By", selected_package.packed_by) }}
-            {{ field_row("Pack Date", selected_package.pack_date) }}
+            {{ field_row("Case Number", selected_package.case_number, "packages[" ~ selected_package_index ~ "].case_number") }}
+            {{ field_row("Internal Reference", selected_package.internal_reference, "packages[" ~ selected_package_index ~ "].internal_reference") }}
+            {{ field_row("Package Type", selected_package.package_type, "packages[" ~ selected_package_index ~ "].package_type") }}
+            {{ field_row("Package Description", selected_package.package_description, "packages[" ~ selected_package_index ~ "].package_description") }}
+            {{ field_row("Status", selected_package.status, "packages[" ~ selected_package_index ~ "].status") }}
+            {{ field_row("Packed By", selected_package.packed_by, "packages[" ~ selected_package_index ~ "].packed_by") }}
+            {{ field_row("Pack Date", selected_package.pack_date, "packages[" ~ selected_package_index ~ "].pack_date") }}
           </div>
           <div class="ssd-section">
             <h3>Dimensions &amp; weights</h3>
-            {{ field_row("Length", selected_package.dimensions.length, selected_package.dimensions.unit or "") }}
-            {{ field_row("Width", selected_package.dimensions.width, selected_package.dimensions.unit or "") }}
-            {{ field_row("Height", selected_package.dimensions.height, selected_package.dimensions.unit or "") }}
-            {{ field_row("Volume", selected_package.volume, selected_package.volume.working.unit if selected_package.volume.working else "") }}
-            {{ field_row("Gross Weight", selected_package.gross_weight, selected_package.gross_weight.working.unit if selected_package.gross_weight.working else "") }}
-            {{ field_row("Net Weight", selected_package.net_weight, selected_package.net_weight.working.unit if selected_package.net_weight.working else "") }}
+            {{ field_row("Length", selected_package.dimensions.length, "packages[" ~ selected_package_index ~ "].dimensions.length", selected_package.dimensions.unit or "") }}
+            {{ field_row("Width", selected_package.dimensions.width, "packages[" ~ selected_package_index ~ "].dimensions.width", selected_package.dimensions.unit or "") }}
+            {{ field_row("Height", selected_package.dimensions.height, "packages[" ~ selected_package_index ~ "].dimensions.height", selected_package.dimensions.unit or "") }}
+            {{ field_row("Volume", selected_package.volume, "packages[" ~ selected_package_index ~ "].volume", selected_package.volume.working.unit if selected_package.volume.working else "") }}
+            {{ field_row("Gross Weight", selected_package.gross_weight, "packages[" ~ selected_package_index ~ "].gross_weight", selected_package.gross_weight.working.unit if selected_package.gross_weight.working else "") }}
+            {{ field_row("Net Weight", selected_package.net_weight, "packages[" ~ selected_package_index ~ "].net_weight", selected_package.net_weight.working.unit if selected_package.net_weight.working else "") }}
           </div>
         </div>
 
         <div class="items-panel">
-          <h3>Contents</h3>
+          <div class="section-heading compact-heading">
+            <div>
+              <h3>Contents</h3>
+              <p>Click the pencil beside any value to edit the working copy.</p>
+            </div>
+          </div>
           <div class="table-wrap">
-            <table class="data-table compact">
+            <table class="data-table compact editable-table">
               <thead>
                 <tr><th>Seq.</th><th>Pos.</th><th>Item</th><th>Description</th><th>Serial</th><th>Qty</th><th>UOM</th></tr>
               </thead>
               <tbody>
                 {% for item in selected_package.items %}
+                {% set item_index = loop.index0 %}
                 <tr>
-                  <td>{{ value_of(item.sequence) }}</td>
-                  <td>{{ value_of(item.position) }}</td>
-                  <td>{{ value_of(item.item_number) }}</td>
-                  <td>{{ value_of(item.description) }}</td>
-                  <td>{{ value_of(item.serial_number) }}</td>
-                  <td>{{ value_of(item.quantity) }}</td>
-                  <td>{{ value_of(item.uom) }}</td>
+                  <td>{{ editable_cell(item.sequence, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].sequence") }}</td>
+                  <td>{{ editable_cell(item.position, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].position") }}</td>
+                  <td>{{ editable_cell(item.item_number, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].item_number") }}</td>
+                  <td>{{ editable_cell(item.description, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].description") }}</td>
+                  <td>{{ editable_cell(item.serial_number, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].serial_number") }}</td>
+                  <td>{{ editable_cell(item.quantity, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].quantity") }}</td>
+                  <td>{{ editable_cell(item.uom, "packages[" ~ selected_package_index ~ "].items[" ~ item_index ~ "].uom") }}</td>
                 </tr>
                 {% else %}
                 <tr><td colspan="7" class="muted-cell">No line items mapped for this case.</td></tr>
@@ -172,11 +242,44 @@
       </section>
       {% endif %}
 
+      <section class="card issues-card" id="issues">
+        <div class="section-heading">
+          <div>
+            <h2>Validation issues</h2>
+            <p>Deterministic checks are rerun immediately after every working-data edit.</p>
+          </div>
+          <div class="issue-chips">
+            <span class="issue-chip blocking">{{ issue_counts.BLOCKING }} blocking</span>
+            <span class="issue-chip warning">{{ issue_counts.WARNING }} warning</span>
+            <span class="issue-chip info">{{ issue_counts.INFO }} info</span>
+          </div>
+        </div>
+        {% if packing.issues %}
+          <div class="issues-list">
+          {% for issue in packing.issues %}
+            <article class="issue-item {{ issue.severity|lower }}">
+              <div class="issue-severity">{{ issue.severity }}</div>
+              <div>
+                <strong>{{ issue.code }}</strong>
+                <p>{{ issue.message }}</p>
+                <small>
+                  {% if issue.case_number %}Case {{ issue.case_number }}{% endif %}
+                  {% if issue.field_path %}{% if issue.case_number %} • {% endif %}{{ issue.field_path }}{% endif %}
+                </small>
+              </div>
+            </article>
+          {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state compact-empty"><strong>No current validation issues.</strong></div>
+        {% endif %}
+      </section>
+
       <section class="card source-card" id="source">
         <div class="section-heading">
           <div>
             <h2>Source evidence</h2>
-            <p>Extracted sections retained from the original packing list.</p>
+            <p>Extracted sections retained from the original packing list. Working edits never alter these records.</p>
           </div>
         </div>
         {% for document in job.documents %}
@@ -184,23 +287,49 @@
             <summary>{{ document.original_name }} · {{ document.page_count or "?" }} page(s)</summary>
             <div class="source-chunks">
               {% for chunk in document.chunks[:30] %}
-              <article>
+              <article id="source-chunk-{{ chunk.id }}">
                 <strong>{{ chunk.locator }}</strong>
                 <pre>{{ chunk.text }}</pre>
               </article>
               {% endfor %}
               {% if document.chunks|length > 30 %}
-                <p class="muted">Additional source sections retained but not shown in this first UI slice.</p>
+                <p class="muted">Additional source sections are retained but not shown in this view.</p>
               {% endif %}
             </div>
           </details>
         {% endfor %}
       </section>
 
+      <section class="card audit-card" id="audit">
+        <div class="section-heading">
+          <div>
+            <h2>Audit timeline</h2>
+            <p>Latest processing, mapping, edit, revert and assistant events.</p>
+          </div>
+        </div>
+        <div class="audit-list">
+          {% for event in audit_events %}
+          <article>
+            <time>{{ event.created_at.strftime("%d %b %Y %H:%M:%S") }}</time>
+            <div>
+              <strong>{{ event.summary }}</strong>
+              <span>{{ event.event_type|replace('_', ' ') }} · {{ event.actor }}</span>
+            </div>
+          </article>
+          {% else %}
+          <div class="empty-state compact-empty">No audit events yet.</div>
+          {% endfor %}
+        </div>
+      </section>
+
       <div class="final-bar">
         <div>
-          <strong>Virtual SSD preview</strong>
-          <span>Editing, validation and final SSD generation are the next development slices.</span>
+          <strong>Virtual SSD working dataset</strong>
+          {% if issue_counts.BLOCKING %}
+            <span>{{ issue_counts.BLOCKING }} blocking issue(s) must be resolved before SSD generation.</span>
+          {% else %}
+            <span>Working data can be reviewed now. Final SSD generation remains disabled until the workbook mapping is verified.</span>
+          {% endif %}
         </div>
         <button class="btn btn-primary" disabled>Generate SSD</button>
       </div>
@@ -249,7 +378,7 @@
     <div class="chat-history" id="chat-history">
       <div class="chat-message assistant">
         {% if packing %}
-          I have the mapped job context. Ask where a value came from, why something looks wrong, or about this shipment.
+          I have the current working dataset and selected case. Ask where a value came from, why validation failed, or about this shipment.
         {% elif job.status == "extracted" %}
           Source extraction is ready. Run the local mapper to create the Virtual SSD.
         {% else %}
@@ -266,14 +395,54 @@
 
   <button class="assistant-reopen" id="assistant-reopen" type="button" hidden>AI</button>
 </div>
+
+<dialog class="field-editor" id="field-editor">
+  <form method="dialog" id="field-editor-form">
+    <div class="field-editor-header">
+      <div>
+        <div class="eyebrow">WORKING VALUE</div>
+        <h3 id="field-editor-title">Edit field</h3>
+      </div>
+      <button type="button" class="icon-btn" data-close-editor>×</button>
+    </div>
+    <input type="hidden" id="field-editor-path">
+    <label>
+      <span>Working value</span>
+      <input type="text" id="field-editor-value" autocomplete="off">
+    </label>
+    <label>
+      <span>Unit</span>
+      <input type="text" id="field-editor-unit" autocomplete="off">
+    </label>
+    <label>
+      <span>Reason / note</span>
+      <textarea id="field-editor-reason" rows="2" placeholder="Optional reason for the change"></textarea>
+    </label>
+    <div class="source-reference">
+      <span>Original source value</span>
+      <strong id="field-editor-source">—</strong>
+      <small id="field-editor-locator"></small>
+    </div>
+    <div class="field-editor-error" id="field-editor-error" hidden></div>
+    <div class="field-editor-actions">
+      <button type="button" class="btn btn-secondary" id="field-editor-revert">Revert to source</button>
+      <div>
+        <button type="button" class="btn btn-secondary" data-close-editor>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save working value</button>
+      </div>
+    </div>
+  </form>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
 <script>
 window.PACKBRIDGE_JOB = {
   id: {{ job.id }},
-  selectedCase: {{ (selected_package.case_number.working.value if selected_package and selected_package.case_number.working else none)|tojson }}
+  selectedCase: {{ (selected_package.case_number.working.value if selected_package and selected_package.case_number.working else none)|tojson }},
+  selectedPackageIndex: {{ selected_package_index|tojson }}
 };
 </script>
+<script src="{{ url_for('static', filename='js/job.js') }}"></script>
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}
