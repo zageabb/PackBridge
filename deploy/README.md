@@ -35,6 +35,18 @@ systemctl --user daemon-reload
 systemctl --user enable --now packbridge.service
 ~~~
 
+The service runs the checked-in Flask-Migrate/Alembic migrations before Gunicorn starts. Production configuration sets `PACKBRIDGE_AUTO_CREATE_DB=0`, so schema changes are owned by migrations rather than `db.create_all()`.
+
+For a manual migration check:
+
+~~~bash
+set -a
+source ~/.config/packbridge/packbridge.env
+set +a
+.venv/bin/python -m flask --app wsgi:application db upgrade
+.venv/bin/python -m flask --app wsgi:application db current
+~~~
+
 Verify:
 
 ~~~bash
