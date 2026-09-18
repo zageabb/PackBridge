@@ -1,6 +1,6 @@
 # Hitachi Energy — QBANK Packing List Profile
 
-Version: 1
+Version: 2
 
 ## Profile status
 
@@ -49,6 +49,37 @@ A future Hitachi Energy/internal vendor document may use a different layout, so 
 | Status | package.status |
 | Packed By | package.packed_by |
 | Pack Date | package.pack_date |
+
+## Active structured rules
+
+The following block is machine-validated PackBridge configuration as well as readable profile documentation.
+
+~~~packbridge-yaml
+document_profile:
+  document_type: packing_list
+  family: qbank
+package_identity:
+  canonical_field: package.case_number
+  page_is_package: false
+continuation:
+  merge_key: package.case_number
+field_aliases:
+  Sales Order: order.sales_order
+  Pos.: order.position
+  Product Type: shipment.product_type
+  Item Description: shipment.description
+  HS Code: shipment.hs_code
+  Case Number: package.case_number
+  Internal HE Number: package.internal_reference
+  Gross Weight: package.gross_weight
+  Net Weight: package.net_weight
+  Packed By: package.packed_by
+  Pack Date: package.pack_date
+dimension_labels:
+  L: length
+  W: width
+  H: height
+~~~
 
 ## Dimension format
 
