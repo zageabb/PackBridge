@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}PackBridge — Settings{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+  <div>
+    <div class="eyebrow">SETTINGS</div>
+    <h1>Local AI</h1>
+    <p>PackBridge uses Ollama for document mapping and the contextual assistant.</p>
+  </div>
+</section>
+
+<div class="settings-grid">
+  <section class="card">
+    <div class="section-heading">
+      <div>
+        <h2>Ollama connection</h2>
+        <p>Baseline mapper model: <code>qwen3:14b</code>.</p>
+      </div>
+      {% if connection.connected %}
+        <span class="status status-mapped">Connected</span>
+      {% else %}
+        <span class="status status-failed">Unavailable</span>
+      {% endif %}
+    </div>
+
+    <form method="post" action="{{ url_for('settings.update') }}" class="form-stack">
+      <label>
+        <span>Ollama URL</span>
+        <input type="text" name="ollama_url" value="{{ values.ollama_url }}" required>
+      </label>
+      <label>
+        <span>Model</span>
+        <input list="ollama-models" type="text" name="ollama_model" value="{{ values.ollama_model }}" required>
+        <datalist id="ollama-models">
+          {% for model in connection.models or [] %}
+          <option value="{{ model }}"></option>
+          {% endfor %}
+        </datalist>
+      </label>
+      <div class="button-row">
+        <button class="btn btn-primary" type="submit">Save settings</button>
+      </div>
+    </form>
+
+    <form method="post" action="{{ url_for('settings.test') }}" class="inline-test-form">
+      <input type="hidden" name="ollama_url" value="{{ values.ollama_url }}">
+      <input type="hidden" name="ollama_model" value="{{ values.ollama_model }}">
+      <button class="btn btn-secondary" type="submit">Test current connection</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Detected models</h2>
+    {% if connection.models %}
+      <div class="model-list">
+      {% for model in connection.models %}
+        <span class="model-chip {% if model == values.ollama_model %}selected{% endif %}">{{ model }}</span>
+      {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state"><span>No model list available.</span></div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
