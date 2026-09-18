@@ -385,6 +385,7 @@ def process(job_id: int):
         packing = map_packing_list(
             document_text,
             profile_hint=profile_hint,
+            profile_path=profile_match.path if profile_match else None,
             progress_callback=progress,
         )
         payload = packing.model_dump_json()
