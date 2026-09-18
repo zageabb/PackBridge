@@ -149,3 +149,93 @@ def test_unmodified_field_is_not_promoted_to_profile_learning(tmp_path):
     )
     assert response.status_code == 400
     assert "Change the field first" in response.get_json()["error"]
+
+
+def test_unrecognised_job_can_draft_inactive_profile_proposal(tmp_path, monkeypatch):
+    from packbridge.learning_schemas import LearnedFieldAlias, LearnedProfileDraft
+    from packbridge.models import SourceChunk, SourceDocument
+
+    app, _ = make_app(tmp_path)
+    packing = PackingList(
+        document={"vendor": "New Supplier"},
+        packages=[
+            Package(
+                case_number=FieldValue(
+                    source=SourceValue(value="CASE-9"),
+                    working=WorkingValue(value="CASE-9", origin="source"),
+                ),
+                gross_weight=FieldValue(
+                    source=SourceValue(value=120, unit="KG"),
+                    working=WorkingValue(value=120, unit="KG", origin="source"),
+                ),
+                net_weight=FieldValue(
+                    source=SourceValue(value=100, unit="KG"),
+                    working=WorkingValue(value=100, unit="KG", origin="source"),
+                ),
+            )
+        ],
+    )
+
+    with app.app_context():
+        job = Job(
+            title="New Supplier Packing List",
+            status="mapped",
+            vendor="New Supplier",
+            working_json=packing.model_dump_json(),
+        )
+        db.session.add(job)
+        db.session.flush()
+        source_path = tmp_path / "data" / "jobs" / str(job.id) / "source" / "packing.pdf"
+        source_path.parent.mkdir(parents=True)
+        source_path.write_bytes(b"%PDF-1.4 test")
+        document = SourceDocument(
+            job_id=job.id,
+            original_name="packing.pdf",
+            stored_name="packing.pdf",
+            path=str(source_path),
+            size_bytes=12,
+            sha256="e" * 64,
+            extraction_status="complete",
+        )
+        db.session.add(document)
+        db.session.flush()
+        db.session.add(
+            SourceChunk(
+                document_id=document.id,
+                position=1,
+                locator="Page 1",
+                text="Packing List Crate ID CASE-9 Shipping Mass 120 KG",
+            )
+        )
+        db.session.commit()
+        job_id = job.id
+
+    monkeypatch.setattr(
+        "packbridge.routes.jobs.draft_profile",
+        lambda **kwargs: LearnedProfileDraft(
+            title="New Supplier Packing List",
+            vendor_name="New Supplier",
+            recognition_indicators=["Packing List", "Crate ID", "Shipping Mass"],
+            field_aliases=[
+                LearnedFieldAlias(
+                    source_term="Crate ID",
+                    canonical_field="package.case_number",
+                )
+            ],
+            continuation_key="package.case_number",
+        ),
+    )
+
+    response = app.test_client().post(
+        f"/jobs/{job_id}/learning/draft-profile",
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        proposal = KnowledgeProposalRecord.query.order_by(KnowledgeProposalRecord.id.desc()).first()
+        assert proposal is not None
+        assert proposal.status == "pending"
+        assert proposal.target_path == "vendors/new-supplier/packing-list.md"
+        assert "Crate ID" in proposal.proposed_content
+        assert not (tmp_path / "knowledge" / proposal.target_path).exists()
