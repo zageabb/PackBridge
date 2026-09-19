@@ -1,0 +1,9 @@
+[Unit]
+Description=PackBridge operational backup
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/ollama-chat/PackBridge
+EnvironmentFile=-%h/.config/packbridge/packbridge.env
+ExecStart=%h/ollama-chat/PackBridge/.venv/bin/python -m flask --app wsgi:application packbridge backup
