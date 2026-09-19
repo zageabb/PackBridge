@@ -200,24 +200,48 @@
     </div>
 
     <div class="validation-notice">
-      <strong>Not production-approved yet.</strong>
-      <span>The validation writer updates only verified SoCs cells, preserves the workbook formula/VBA structure, reopens the result, checks the structure fingerprint and compares every written value. SAP acceptance testing is still required before this becomes the final production Generate SSD action.</span>
+      <strong>Controlled validation path.</strong>
+      <span>The validation writer updates only verified SoCs cells, preserves the controlled workbook structure, reopens the result, checks the structure fingerprint and compares every written value.</span>
+    </div>
+
+    <div class="project-generation-bar production-generation-bar">
+      <div>
+        <strong>Production SSD release</strong>
+        {% if production_ready %}
+          <span>SAP release gates are enabled, the template is clean, and the current preview has no unresolved warnings/blockers.</span>
+        {% else %}
+          <span>
+            Production remains locked until external acceptance is recorded:
+            SAP output {{ '✓' if production_gates.sap_output_approved else '✗' }},
+            SoCs-only import {{ '✓' if production_gates.socs_only_approved else '✗' }},
+            macro-free {{ '✓' if production_gates.macro_free_approved else 'not approved/required only for XLSX' }}.
+          </span>
+        {% endif %}
+      </div>
+      {% if production_ready and packbridge_can('output_generate') %}
+      <form method="post" action="{{ url_for('projects.build_production_workbook', project_id=project.id) }}" onsubmit="return window.confirm('Generate the production SSD from the approved working data and controlled template?');">
+        <button class="btn btn-primary" type="submit">Generate production SSD</button>
+      </form>
+      {% elif not production_ready %}
+        <span class="status status-processing">Release gate locked</span>
+      {% endif %}
     </div>
 
     {% if project.outputs %}
     <div class="section-heading output-history-heading">
       <div>
-        <h3>Validation outputs</h3>
+        <h3>SSD outputs</h3>
         <p>Verified workbook copies retained for comparison and SAP acceptance testing.</p>
       </div>
     </div>
     <div class="table-wrap">
       <table class="data-table compact">
-        <thead><tr><th>Created</th><th>File</th><th>Rows</th><th>SHA-256</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Created</th><th>Type</th><th>File</th><th>Rows</th><th>SHA-256</th><th>Status</th><th></th></tr></thead>
         <tbody>
         {% for output in project.outputs %}
           <tr>
             <td>{{ output.created_at.strftime("%d %b %Y %H:%M:%S") }}</td>
+            <td><span class="status status-{{ 'mapped' if output.output_type == 'production' else 'processing' }}">{{ output.output_type }}</span></td>
             <td>{{ output.filename }}</td>
             <td>{{ output.rows_written }}</td>
             <td><code>{{ output.sha256[:12] }}…</code></td>
