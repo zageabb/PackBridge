@@ -27,6 +27,17 @@ class Config:
     OCR_MODE = os.getenv("PACKBRIDGE_OCR_MODE", "off").strip().casefold()
     OCR_LANGUAGE = os.getenv("PACKBRIDGE_OCR_LANGUAGE", "eng").strip() or "eng"
 
+    AUTH_ENABLED = os.getenv("PACKBRIDGE_AUTH_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
+    USERS_FILE = Path(
+        os.getenv(
+            "PACKBRIDGE_USERS_FILE",
+            Path.home() / ".config" / "packbridge" / "users.json",
+        )
+    ).expanduser().resolve()
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = os.getenv("PACKBRIDGE_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes", "on"}
+
     MAX_CONTENT_LENGTH = int(os.getenv("PACKBRIDGE_MAX_UPLOAD_MB", "100")) * 1024 * 1024
     AUTO_CREATE_DB = os.getenv("PACKBRIDGE_AUTO_CREATE_DB", "1").strip().lower() in {"1", "true", "yes", "on"}
     SQLALCHEMY_DATABASE_URI = os.getenv(
