@@ -45,6 +45,10 @@ class Config:
     LOG_BACKUP_COUNT = int(os.getenv("PACKBRIDGE_LOG_BACKUP_COUNT", "5"))
     RETENTION_DAYS = int(os.getenv("PACKBRIDGE_RETENTION_DAYS", "90"))
 
+    SAP_OUTPUT_APPROVED = os.getenv("PACKBRIDGE_SAP_OUTPUT_APPROVED", "0").strip().lower() in {"1", "true", "yes", "on"}
+    SAP_SOCS_ONLY_APPROVED = os.getenv("PACKBRIDGE_SAP_SOCS_ONLY_APPROVED", "0").strip().lower() in {"1", "true", "yes", "on"}
+    SAP_MACRO_FREE_APPROVED = os.getenv("PACKBRIDGE_SAP_MACRO_FREE_APPROVED", "0").strip().lower() in {"1", "true", "yes", "on"}
+
     MAX_CONTENT_LENGTH = int(os.getenv("PACKBRIDGE_MAX_UPLOAD_MB", "100")) * 1024 * 1024
     AUTO_CREATE_DB = os.getenv("PACKBRIDGE_AUTO_CREATE_DB", "1").strip().lower() in {"1", "true", "yes", "on"}
     SQLALCHEMY_DATABASE_URI = os.getenv(
