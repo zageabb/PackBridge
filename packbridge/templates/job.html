@@ -222,6 +222,7 @@
               {% set next_case = next_package.case_number.working.value if next_package.case_number.working else "Case" %}
               <a class="btn btn-secondary" href="{{ url_for('jobs.view', job_id=job.id, case=next_case) }}#case-panel">Next →</a>
             {% endif %}
+            <button class="btn btn-secondary" type="button" data-reprocess-package data-package-index="{{ selected_package_index }}">Reprocess case</button>
             <button class="btn btn-secondary" type="button" data-revert-package data-package-index="{{ selected_package_index }}">Revert case</button>
           </div>
         </div>
@@ -698,6 +699,7 @@
     <div class="field-editor-error" id="field-editor-error" hidden></div>
     <div class="field-editor-actions">
       <div class="field-editor-secondary-actions">
+        <button type="button" class="btn btn-secondary" id="field-editor-reprocess">Reprocess field</button>
         <button type="button" class="btn btn-secondary" id="field-editor-revert">Revert to source</button>
         <button type="button" class="btn btn-secondary" id="field-editor-learn" hidden>Propose profile learning</button>
       </div>
