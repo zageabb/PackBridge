@@ -64,6 +64,25 @@
   </section>
 </div>
 
+<section class="card">
+  <div class="section-heading">
+    <div>
+      <h2>Production readiness</h2>
+      <p>Read-only deployment diagnostics. Release gates are set in the external environment after acceptance, not from the browser.</p>
+    </div>
+  </div>
+  <dl class="diagnostic-list readiness-list">
+    <div><dt>Authentication</dt><dd>{{ "Enabled" if operational.auth_enabled else "Disabled (trusted/local mode)" }}</dd></div>
+    <div><dt>OCR mode</dt><dd>{{ operational.ocr_mode }}{% if operational.ocr_mode == 'tesseract' %} · Tesseract {{ "available" if operational.tesseract_available else "missing" }}{% endif %}</dd></div>
+    <div><dt>Operational retention</dt><dd>{{ operational.retention_days ~ " days" if operational.retention_days else "Deletion disabled" }}</dd></div>
+    <div><dt>Backup retention</dt><dd>{{ operational.backup_retention_days ~ " days" if operational.backup_retention_days else "Deletion disabled" }}</dd></div>
+    <div><dt>SAP production output</dt><dd><span class="status status-{{ 'mapped' if operational.sap_output_approved else 'processing' }}">{{ "Approved" if operational.sap_output_approved else "Locked" }}</span></dd></div>
+    <div><dt>SoCs-only SAP path</dt><dd><span class="status status-{{ 'mapped' if operational.socs_only_approved else 'processing' }}">{{ "Approved" if operational.socs_only_approved else "Not accepted" }}</span></dd></div>
+    <div><dt>Macro-free XLSX</dt><dd><span class="status status-{{ 'mapped' if operational.macro_free_approved else 'processing' }}">{{ "Approved" if operational.macro_free_approved else "Not accepted" }}</span></dd></div>
+  </dl>
+  <p class="muted">See <code>docs/17_ACCEPTANCE_AND_BENCHMARK.md</code> and <code>docs/18_PRODUCTION_HANDOVER.md</code> before changing production release flags.</p>
+</section>
+
 <section class="card template-settings-card">
   <div class="section-heading">
     <div>
