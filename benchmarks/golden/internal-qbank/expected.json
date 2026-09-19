@@ -1,0 +1,29 @@
+{
+  "packages": [
+    {
+      "case_number": "CASE-100",
+      "gross_weight": 830,
+      "net_weight": 643,
+      "length": 148,
+      "width": 152,
+      "height": 66,
+      "items": [
+        {
+          "item_number": "100001",
+          "description": "Reactor assembly",
+          "quantity": 1,
+          "uom": "PC"
+        },
+        {
+          "item_number": "100002",
+          "description": "Support frame",
+          "quantity": 2,
+          "uom": "PC"
+        }
+      ]
+    }
+  ],
+  "must_be_null": [
+    "shipment.country_of_origin"
+  ]
+}
