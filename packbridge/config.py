@@ -20,6 +20,8 @@ class Config:
     DATA_ROOT = Path(os.getenv("PACKBRIDGE_DATA_ROOT", BASE_DIR / "data")).resolve()
     KNOWLEDGE_ROOT = Path(os.getenv("PACKBRIDGE_KNOWLEDGE_ROOT", BASE_DIR / "knowledge")).resolve()
     TEMPLATE_ROOT = Path(os.getenv("PACKBRIDGE_TEMPLATE_ROOT", BASE_DIR / "ssd_templates")).resolve()
+    LOG_ROOT = Path(os.getenv("PACKBRIDGE_LOG_ROOT", BASE_DIR / "instance" / "logs")).resolve()
+    BACKUP_ROOT = Path(os.getenv("PACKBRIDGE_BACKUP_ROOT", BASE_DIR / "instance" / "backups")).resolve()
 
     OLLAMA_URL = os.getenv("PACKBRIDGE_OLLAMA_URL", "http://192.168.1.249:11434").rstrip("/")
     OLLAMA_MODEL = os.getenv("PACKBRIDGE_OLLAMA_MODEL", "qwen3:14b")
@@ -37,6 +39,11 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = os.getenv("PACKBRIDGE_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes", "on"}
+
+    LOG_LEVEL = os.getenv("PACKBRIDGE_LOG_LEVEL", "INFO")
+    LOG_MAX_BYTES = int(os.getenv("PACKBRIDGE_LOG_MAX_BYTES", "5000000"))
+    LOG_BACKUP_COUNT = int(os.getenv("PACKBRIDGE_LOG_BACKUP_COUNT", "5"))
+    RETENTION_DAYS = int(os.getenv("PACKBRIDGE_RETENTION_DAYS", "90"))
 
     MAX_CONTENT_LENGTH = int(os.getenv("PACKBRIDGE_MAX_UPLOAD_MB", "100")) * 1024 * 1024
     AUTO_CREATE_DB = os.getenv("PACKBRIDGE_AUTO_CREATE_DB", "1").strip().lower() in {"1", "true", "yes", "on"}
