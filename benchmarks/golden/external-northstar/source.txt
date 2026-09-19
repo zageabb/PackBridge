@@ -1,0 +1,20 @@
+[Document]
+NORTHSTAR LOGISTICS PACKING NOTE
+
+Package No: PKG-A1
+Overall dimensions: 2.4 m x 1.1 m x 1.3 m
+Gross mass: 1250 kg
+Net mass: 1110 kg
+Item code: NS-10
+Description: Transformer accessory set
+Packed quantity: 4 SET
+
+Package No: PKG-A2
+Overall dimensions: 1.8 m x 1.0 m x 0.9 m
+Gross mass: 620 kg
+Net mass: 570 kg
+Item code: NS-20
+Description: Cable termination kit
+Packed quantity: 6 KIT
+
+Country of Origin:
