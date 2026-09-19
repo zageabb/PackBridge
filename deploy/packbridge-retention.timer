@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly PackBridge retention cleanup
+
+[Timer]
+OnCalendar=Sun *-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=1200
+Unit=packbridge-retention.service
+
+[Install]
+WantedBy=timers.target
