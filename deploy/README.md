@@ -84,3 +84,80 @@ qwen3:14b
 ~~~
 
 The application Settings page can override the active Ollama URL/model at runtime.
+
+## Optional local authentication
+
+Authentication is disabled by default for trusted development use. For production set:
+
+~~~text
+PACKBRIDGE_AUTH_ENABLED=1
+PACKBRIDGE_USERS_FILE=/home/zageabb/.config/packbridge/users.json
+~~~
+
+Create the first administrator with:
+
+~~~bash
+set -a
+source ~/.config/packbridge/packbridge.env
+set +a
+.venv/bin/python -m flask --app wsgi:application packbridge init-user --username admin --role admin
+~~~
+
+Do not copy plaintext passwords into Git or the environment file.
+
+## Optional scanned-PDF OCR
+
+PackBridge prefers digital text extraction. To enable the fully local fallback for scanned PDFs, install Tesseract on the host and set:
+
+~~~text
+PACKBRIDGE_OCR_MODE=tesseract
+PACKBRIDGE_OCR_LANGUAGE=eng
+~~~
+
+If Tesseract is not installed, keep OCR mode off. `/ready` reports whether the executable is available.
+
+## Backup, retention and logs
+
+Operational backup/log paths are external to the Git checkout.
+
+Example manual backup:
+
+~~~bash
+.venv/bin/python -m flask --app wsgi:application packbridge backup
+~~~
+
+Install the optional timers:
+
+~~~bash
+cp deploy/packbridge-backup.service deploy/packbridge-backup.timer ~/.config/systemd/user/
+cp deploy/packbridge-retention.service deploy/packbridge-retention.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now packbridge-backup.timer packbridge-retention.timer
+~~~
+
+Retention deletion is disabled by default (PACKBRIDGE_RETENTION_DAYS=0 and PACKBRIDGE_BACKUP_RETENTION_DAYS=0). Set non-zero periods only after the production retention policy is agreed.
+
+## Model qualification
+
+Run the same controlled golden set against both local candidates:
+
+~~~bash
+.venv/bin/python -m flask --app wsgi:application packbridge benchmark --model qwen3:14b
+.venv/bin/python -m flask --app wsgi:application packbridge benchmark --model qwen3:8b
+~~~
+
+Then compare the generated JSON reports with `packbridge benchmark-compare`.
+
+## SAP production release gates
+
+Production generation is deliberately locked by default. These flags represent external business/SAP acceptance, not development switches:
+
+~~~text
+PACKBRIDGE_SAP_OUTPUT_APPROVED=0
+PACKBRIDGE_SAP_SOCS_ONLY_APPROVED=0
+PACKBRIDGE_SAP_MACRO_FREE_APPROVED=0
+~~~
+
+Leave them disabled until the acceptance steps in `docs/17_ACCEPTANCE_AND_BENCHMARK.md` are complete.
+
+The full production handover and recovery procedure is in `docs/18_PRODUCTION_HANDOVER.md`.
