@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}PackBridge — Sign in{% endblock %}
+{% block content %}
+<section class="login-shell">
+  <div class="card login-card">
+    <div class="eyebrow">PACKBRIDGE ACCESS</div>
+    <h1>Sign in</h1>
+    <p>Use the local PackBridge account provided by the production administrator.</p>
+    <form method="post" class="form-stack">
+      <label><span>Username</span><input name="username" autocomplete="username" required autofocus></label>
+      <label><span>Password</span><input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="btn btn-primary" type="submit">Sign in</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
