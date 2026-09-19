@@ -112,11 +112,12 @@ def capability_for_endpoint(endpoint: str | None, method: str) -> str:
     endpoint = endpoint or ""
     method = method.upper()
 
+    if endpoint.startswith("settings."):
+        return "settings_manage"
+
     if method in {"GET", "HEAD", "OPTIONS"}:
         return "read"
 
-    if endpoint in {"settings.update", "settings.test", "settings.template_upload", "settings.template_clean"}:
-        return "settings_manage"
 
     if endpoint in {"knowledge.apply", "knowledge.reject"}:
         return "knowledge_manage"
