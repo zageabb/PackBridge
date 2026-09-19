@@ -1,0 +1,24 @@
+{
+  "packages": [
+    {
+      "case_number": "CR-77",
+      "gross_weight": 410,
+      "net_weight": 365,
+      "length": 120,
+      "width": 80,
+      "height": 95,
+      "package_type": "Wooden crate",
+      "items": [
+        {
+          "item_number": "AC-500",
+          "description": "Control cabinet",
+          "quantity": 1,
+          "uom": "EA"
+        }
+      ]
+    }
+  ],
+  "must_be_null": [
+    "order.customer_project"
+  ]
+}
