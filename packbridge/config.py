@@ -44,6 +44,7 @@ class Config:
     LOG_MAX_BYTES = int(os.getenv("PACKBRIDGE_LOG_MAX_BYTES", "5000000"))
     LOG_BACKUP_COUNT = int(os.getenv("PACKBRIDGE_LOG_BACKUP_COUNT", "5"))
     RETENTION_DAYS = int(os.getenv("PACKBRIDGE_RETENTION_DAYS", "90"))
+    BACKUP_RETENTION_DAYS = int(os.getenv("PACKBRIDGE_BACKUP_RETENTION_DAYS", "30"))
 
     SAP_OUTPUT_APPROVED = os.getenv("PACKBRIDGE_SAP_OUTPUT_APPROVED", "0").strip().lower() in {"1", "true", "yes", "on"}
     SAP_SOCS_ONLY_APPROVED = os.getenv("PACKBRIDGE_SAP_SOCS_ONLY_APPROVED", "0").strip().lower() in {"1", "true", "yes", "on"}
