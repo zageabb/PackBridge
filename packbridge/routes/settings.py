@@ -3,6 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 
 from packbridge.services import runtime_settings
+from packbridge.services.local_ocr import tesseract_available
 from packbridge.services.template_store import (
     TemplateInstallError,
     active_template,
@@ -23,6 +24,16 @@ def index():
         values=values,
         connection=connection,
         template=template,
+        operational={
+            "ocr_mode": current_app.config.get("OCR_MODE", "off"),
+            "tesseract_available": tesseract_available(),
+            "auth_enabled": bool(current_app.config.get("AUTH_ENABLED", False)),
+            "retention_days": int(current_app.config.get("RETENTION_DAYS", 0)),
+            "backup_retention_days": int(current_app.config.get("BACKUP_RETENTION_DAYS", 0)),
+            "sap_output_approved": bool(current_app.config.get("SAP_OUTPUT_APPROVED", False)),
+            "socs_only_approved": bool(current_app.config.get("SAP_SOCS_ONLY_APPROVED", False)),
+            "macro_free_approved": bool(current_app.config.get("SAP_MACRO_FREE_APPROVED", False)),
+        },
     )
 
 
