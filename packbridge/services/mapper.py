@@ -22,6 +22,7 @@ from .normalise import to_packing_list
 from .prompt_service import render_prompt
 from .postprocess import merge_continuation_packages
 from .runtime_settings import client
+from .ollama_client import OllamaClient
 from .validation import validate_packing_list
 
 
@@ -295,6 +296,7 @@ def _map_segment(
     knowledge: str,
     segment_number: int,
     segment_count: int,
+    mapper_client: OllamaClient | None = None,
 ) -> MapperResult:
     segment_hint = profile_hint or "No profile selected. Use generic packing-list mapping."
     if segment_count > 1:
@@ -311,7 +313,7 @@ def _map_segment(
         document_text=segment,
     )
 
-    result = client().generate_json(prompt, MapperResult)
+    result = (mapper_client or client()).generate_json(prompt, MapperResult)
     if not result.available:
         raise MappingError(
             f"Local mapper failed on segment {segment_number}/{segment_count}: "
@@ -326,6 +328,7 @@ def map_packing_list(
     *,
     profile_path: str | None = None,
     progress_callback: Callable[[str, int, int], None] | None = None,
+    mapper_client: OllamaClient | None = None,
 ) -> PackingList:
     knowledge_root = Path(current_app.config["KNOWLEDGE_ROOT"])
     query = "packing list package case gross net dimensions items UOM"
@@ -365,6 +368,7 @@ def map_packing_list(
                 knowledge=knowledge,
                 segment_number=index,
                 segment_count=segment_count,
+                mapper_client=mapper_client,
             )
         )
         if progress_callback is not None:
