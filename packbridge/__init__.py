@@ -16,6 +16,11 @@ def create_app(config_object: type[Config] = Config) -> Flask:
     Path(app.config["DATA_ROOT"]).mkdir(parents=True, exist_ok=True)
     Path(app.config["KNOWLEDGE_ROOT"]).mkdir(parents=True, exist_ok=True)
     Path(app.config["TEMPLATE_ROOT"]).mkdir(parents=True, exist_ok=True)
+    Path(app.config["LOG_ROOT"]).mkdir(parents=True, exist_ok=True)
+    Path(app.config["BACKUP_ROOT"]).mkdir(parents=True, exist_ok=True)
+
+    from .services.logging_config import configure_logging
+    configure_logging(app)
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -34,6 +39,9 @@ def create_app(config_object: type[Config] = Config) -> Flask:
     app.register_blueprint(knowledge_bp)
     app.register_blueprint(projects_bp)
     app.register_blueprint(settings_bp)
+
+    from .cli import register_cli
+    register_cli(app)
 
     from .services.auth import capability_for_endpoint, current_identity
 
