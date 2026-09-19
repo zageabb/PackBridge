@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily PackBridge operational backup
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+Persistent=true
+RandomizedDelaySec=900
+Unit=packbridge-backup.service
+
+[Install]
+WantedBy=timers.target
