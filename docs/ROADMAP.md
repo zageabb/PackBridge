@@ -1,5 +1,11 @@
 # PackBridge Roadmap
 
+## Current status
+
+Milestones 1–4 and 7 are development-complete. Milestone 5 is development-complete for the physically verified SoCs output scope and has a production release gate; final success still requires the external SAP acceptance test. Milestone 6 has the multi-layout benchmark harness/fixtures implemented; the real-host 14B/8B runs remain qualification work.
+
+External qualification is tracked separately in `docs/19_EXTERNAL_ACCEPTANCE_CHECKLIST.md`. Source development does not guess unverified PL/ML workbook mappings.
+
 ## Milestone 1 — First visible proof
 
 **Goal:** Upload the reference packing list and show correctly grouped cases in a browser Virtual SSD.
