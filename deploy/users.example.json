@@ -1,0 +1,9 @@
+{
+  "users": [
+    {
+      "username": "admin",
+      "role": "admin",
+      "password_hash": "GENERATE_WITH_FLASK_PACKBRIDGE_INIT_USER"
+    }
+  ]
+}
