@@ -51,6 +51,22 @@ The default local model is `qwen3:14b`; change the Ollama URL/model through Sett
 
 ## Current implementation
 
-The current development build includes document upload/extraction, deterministic document-profile matching, local Ollama structured mapping, an editable provenance-aware Virtual SSD, validation issues, field/case/job revert controls, a resizable job assistant, audit history, and a read-only Knowledge browser.
+PackBridge source development is complete for the currently verified scope.
 
-Final SSD generation remains intentionally disabled until the reference workbook has been inspected and its SAP-sensitive mapping has been verified.
+The application now includes:
+
+- local document ingestion for PDF/DOCX/XLSX/XLSM/CSV/TXT/Markdown, with optional local Tesseract OCR for scanned PDFs;
+- deterministic profile matching plus generic structured mapping through local Ollama;
+- staged mapping for larger documents and continuation-page/case merging;
+- an editable provenance-aware Virtual SSD with source evidence, PDF-page verification, validation, acknowledgements, reverts and field/case reprocessing;
+- a job-aware local assistant with evidence grounding, deterministic shipment queries and reviewable Apply/Cancel changes;
+- governed Knowledge/profile learning, versioning, diff/approval, import/export and correction-to-profile proposals;
+- multi-job SSD Projects, controlled template inspection/cleaning/versioning and deterministic SoCs output;
+- structurally/value-verified validation workbooks and an explicitly SAP-gated production generation/download path;
+- optional local authentication and centrally enforced roles;
+- rotating logs, database migrations, backup/restore, opt-in retention, health/readiness diagnostics and Ubuntu/UDA deployment packaging;
+- a multi-layout golden benchmark harness for comparing the 14B baseline with smaller local candidates.
+
+PackBridge does **not** claim that SAP acceptance has happened. Production output remains locked by deployment flags until the external checks in [External Acceptance Checklist](docs/19_EXTERNAL_ACCEPTANCE_CHECKLIST.md) are completed. The software never guesses unverified PL/ML workbook cell mappings.
+
+See [Acceptance and Benchmark Criteria](docs/17_ACCEPTANCE_AND_BENCHMARK.md) and [Production Handover](docs/18_PRODUCTION_HANDOVER.md).
