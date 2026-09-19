@@ -15,6 +15,7 @@ from packbridge.services.operations import (
     apply_retention,
     create_backup,
     inspect_backup,
+    prune_backups,
     restore_backup,
 )
 
@@ -126,6 +127,24 @@ def register_cli(app: Flask) -> None:
         )
         click.echo(json.dumps(result, indent=2))
 
+    @packbridge_group.command("backup-prune")
+    @click.option("--apply", "do_apply", is_flag=True, help="Actually remove expired backup archives.")
+    @click.option("--days", type=int, default=None)
+    def backup_prune(do_apply: bool, days: int | None):
+        """List or remove backup archives older than the configured policy."""
+
+        policy_days = days if days is not None else int(app.config["BACKUP_RETENTION_DAYS"])
+        candidates = prune_backups(
+            Path(app.config["BACKUP_ROOT"]),
+            days=policy_days,
+            dry_run=not do_apply,
+        )
+        for path in candidates:
+            click.echo(str(path))
+        click.echo(
+            f"{'Removed' if do_apply else 'Would remove'} {len(candidates)} backup(s) "
+            f"older than {policy_days} day(s)."
+        )
     @packbridge_group.command("retention")
     @click.option("--apply", "do_apply", is_flag=True, help="Actually remove expired operational folders.")
     @click.option("--days", type=int, default=None)
