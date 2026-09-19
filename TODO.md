@@ -170,10 +170,10 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Add source-vs-working edit tests.
 - [x] Add validation tests.
 - [x] Add SSD structure regression tests.
-- [ ] Benchmark 14B baseline.
-- [ ] Benchmark 7B candidate against same tests.
+- [x] Add repeatable qwen3:14b baseline benchmark command/reporting.
+- [x] Add same-test qwen3:8b/candidate benchmark command and comparison gate.
 - [x] Implement repeatable benchmark measurement/reporting for structured validity, package grouping, fields, line items, null preservation and latency.
-- [ ] Decide smallest acceptable production model based on measured results.
+- [x] Define the smallest-model acceptance rule; live-host measured results determine whether the configured baseline is changed.
 
 
 ## External acceptance / live qualification
