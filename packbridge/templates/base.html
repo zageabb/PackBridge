@@ -17,11 +17,19 @@
       </span>
     </a>
     <nav class="nav">
-      <a href="{{ url_for('main.index') }}">Jobs</a>
-      <a href="{{ url_for('projects.index') }}">SSD Projects</a>
-      <a href="{{ url_for('knowledge.index') }}">Knowledge</a>
-      <a href="{{ url_for('settings.index') }}">Settings</a>
-      <span class="local-pill">Local AI</span>
+      {% if not packbridge_auth_enabled or packbridge_user %}
+        <a href="{{ url_for('main.index') }}">Jobs</a>
+        <a href="{{ url_for('projects.index') }}">SSD Projects</a>
+        <a href="{{ url_for('knowledge.index') }}">Knowledge</a>
+        {% if packbridge_can('settings_manage') %}<a href="{{ url_for('settings.index') }}">Settings</a>{% endif %}
+        <span class="local-pill">Local AI</span>
+        {% if packbridge_auth_enabled and packbridge_user %}
+          <span class="user-pill">{{ packbridge_user.username }} · {{ packbridge_user.role }}</span>
+          <form method="post" action="{{ url_for('auth.logout') }}" class="nav-logout">
+            <button type="submit">Sign out</button>
+          </form>
+        {% endif %}
+      {% endif %}
     </nav>
   </header>
 
