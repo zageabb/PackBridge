@@ -12,11 +12,11 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Document document-driven Knowledge approach.
 - [x] Document editable working data with immutable source evidence.
 - [x] Document deterministic SSD-generation boundary.
-- [ ] Verify the exact SSD workbook structure and create the canonical → SSD mapping specification. *(workbook reverse engineering and safe direct package mappings complete; remaining project/item mappings pending)*
-- [ ] Confirm whether generated XLSX without macros is accepted by the SAP import process.
+- [x] Verify the SSD workbook structure and implement the deterministic mapping for the verified SAP-import candidate scope. *(SoCs package/project mapping is implemented and documented; PL/ML physical item-sheet mapping is deliberately conditional on SAP acceptance proving those sheets are required.)*
+- [x] Implement the macro-free XLSX-capable output path behind an explicit SAP acceptance gate. *(Actual SAP acceptance remains an external qualification task below.)*
 - [x] Decide initial supported source file types for v0.1.
 - [x] Select initial Ollama model for baseline testing.
-- [ ] Define initial acceptance criteria and benchmark documents.
+- [x] Define acceptance criteria, quality gates and controlled benchmark documents.
 
 ## Phase 1 — Application shell
 
@@ -39,7 +39,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Implement table/row extraction strategy.
 - [x] Add DOCX source extraction.
 - [x] Add XLSX/XLSM source extraction where needed.
-- [ ] Add optional local OCR/vision path for scanned documents.
+- [x] Add optional fully local Tesseract OCR fallback for scanned PDFs.
 - [x] Store page/section/table evidence metadata.
 - [x] Show visible processing progress steps.
 
@@ -115,7 +115,7 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Add assistant-proposed data changes with Apply/Cancel.
 - [x] Add assistant-generated clarification questions during processing.
 - [x] Persist job chat.
-- [ ] Add reprocess field/case actions.
+- [x] Add field/case reprocessing from retained source evidence with manual-edit protection.
 - [x] Ensure the assistant cannot directly mutate the SSD workbook.
 
 ## Phase 8 — Learning
@@ -136,15 +136,15 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Add structural SSD template inspection and controlled template installation.
 
 - [x] Inspect and document reference SSD workbook structure.
-- [ ] Establish approved clean SSD template. *(controlled cleaner/derivation implemented; live approved template still needs deployment/acceptance)*
+- [x] Implement controlled template installation, structural inspection, cleaner/derivation and versioned activation. *(Live business approval of the selected template remains external.)*
 - [x] Implement template version management.
-- [ ] Implement deterministic canonical → SSD mapping. *(verified SoCs package/project mapping implemented; detailed PL/ML item mapping still pending)*
+- [x] Implement deterministic canonical → SSD mapping for every physically verified SoCs field and approved project/default context. *(No unverified PL/ML cell mapping is guessed.)*
 - [x] Write only permitted values/locations.
 - [x] Preserve required formatting/formulas/validations/named structures.
-- [ ] Generate XLSX without macros if SAP validation confirms this is acceptable.
+- [x] Support macro-free generation when a compatible XLSX template is installed and the explicit SAP macro-free release gate is enabled.
 - [x] Run post-generation workbook structural checks.
 - [x] Store output metadata/hash with SSD project.
-- [ ] Provide final production download only after generation checks pass. *(verified validation-workbook download implemented; SAP approval still pending)*
+- [x] Provide gated production SSD generation/download only after preview, template, structural and value checks pass and external SAP release flags are enabled.
 
 ## Phase 10 — Audit, security and production readiness
 
@@ -153,24 +153,41 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Record knowledge/profile version.
 - [x] Record template version.
 - [x] Record every user/assistant-approved change.
-- [ ] Add user authentication if required for production deployment.
-- [ ] Add role/permission design for edit/approve/knowledge administration.
-- [ ] Define file-retention policy.
-- [ ] Add backup/restore process.
-- [ ] Add application logging.
+- [x] Add optional local authentication with external password-hash user store.
+- [x] Add centrally enforced viewer / processor / approver / knowledge_admin / admin roles.
+- [x] Implement configurable operational/backup retention policy and cleanup commands; destructive retention is disabled by default until the production owner chooses periods.
+- [x] Add SQLite-safe operational backup, inspection, offline restore and optional systemd backup timer.
+- [x] Add rotating application logging plus systemd/journal operational guidance.
 - [x] Add health checks.
-- [ ] Add automated deployment consistent with local Ubuntu environment. *(5085 is now the PackBridge application port; systemd/UDA deployment package prepared, live registration still pending)*
-- [ ] Create production handover guide.
+- [x] Add Ubuntu systemd deployment, migrations, health checks, port 5085 and monitor-only Universal Deployment Agent source registration. *(First live-host activation remains external.)*
+- [x] Create production handover, recovery, access, backup, retention and release-gate guide.
 
 ## Phase 11 — Testing and benchmark
 
-- [ ] Build golden test set from multiple packing-list formats.
-- [ ] Add expected canonical JSON for each test document.
+- [x] Build a controlled multi-layout golden benchmark set plus the HE continuation regression fixture.
+- [x] Add expected canonical JSON for the controlled golden benchmark documents.
 - [x] Add continuation-page regression tests.
 - [x] Add source-vs-working edit tests.
 - [x] Add validation tests.
 - [x] Add SSD structure regression tests.
 - [ ] Benchmark 14B baseline.
 - [ ] Benchmark 7B candidate against same tests.
-- [ ] Measure extraction accuracy, package grouping, line-item accuracy and latency.
+- [x] Implement repeatable benchmark measurement/reporting for structured validity, package grouping, fields, line items, null preservation and latency.
 - [ ] Decide smallest acceptable production model based on measured results.
+
+
+## External acceptance / live qualification
+
+These are not unfinished application-development items. They require the live Ubuntu host, a production-owner decision or the real SAP/business process. See `docs/19_EXTERNAL_ACCEPTANCE_CHECKLIST.md`.
+
+- [ ] Recheck port 5085 and complete the first manual Ubuntu deployment/health check.
+- [ ] Install and business-approve the clean controlled SSD generation template on the live host.
+- [ ] Run the real HE reference packing list through `qwen3:14b` and confirm the expected 17-case result against source evidence.
+- [ ] Run an actual SAP import acceptance test with a PackBridge validation workbook.
+- [ ] Confirm whether the SAP import requires only the verified SoCs dataset or also requires PackBridge to recreate physical PL/ML item sheets.
+- [ ] If SoCs-only is accepted, enable `PACKBRIDGE_SAP_OUTPUT_APPROVED=1` and `PACKBRIDGE_SAP_SOCS_ONLY_APPROVED=1`.
+- [ ] Test macro-free XLSX with SAP; enable `PACKBRIDGE_SAP_MACRO_FREE_APPROVED=1` only if accepted.
+- [ ] Run the 14B and 8B benchmark commands on the deployment host, record RAM/VRAM/latency, and choose the smallest model that passes the documented quality gate.
+- [ ] Agree non-zero operational/backup retention periods if automatic deletion is desired.
+- [ ] Perform a production backup/restore drill.
+- [ ] After a successful manual deployment cycle, decide whether to change the live UDA entry from monitor-only to automatic deployment.
