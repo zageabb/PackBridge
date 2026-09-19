@@ -1,0 +1,23 @@
+[Page 1]
+Packing List
+Sales Order: 890000001
+Pos.: 10
+Product Type: QBANK
+Case Number: CASE-100
+Internal HE Number: HE-100
+Dimensions: L=148 W=152 H=66 CM
+Gross Weight: 830 KG
+Net Weight: 643 KG
+Type of Package: CAP-BOX
+Country of Origin:
+
+Seq. | Pos. | Item | Description | Serial Number | Quantity | UOM
+1 | 10 | 100001 | Reactor assembly | | 1 | PC
+
+[Page 2]
+Packing List
+Sales Order: 890000001
+Pos.: 10
+Case Number: CASE-100
+Seq. | Pos. | Item | Description | Serial Number | Quantity | UOM
+2 | 10 | 100002 | Support frame | | 2 | PC
