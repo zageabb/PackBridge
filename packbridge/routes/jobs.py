@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 
 from flask import (
     Blueprint,
@@ -57,9 +59,17 @@ from packbridge.services.profile_learning import (
     suggested_profile_path,
 )
 from packbridge.services.profile_matching import match_profile
+from packbridge.services.reprocess import (
+    ReprocessError,
+    collect_locators,
+    find_package as find_reprocessed_package,
+    replace_field_from_remap,
+    source_text_for_locators,
+)
 from packbridge.services.runtime_settings import client as ollama_client
 from packbridge.services.storage import save_job_upload
 from packbridge.services.ssd_preview import build_ssd_preview
+from packbridge.services.validation import validate_packing_list
 from packbridge.services.validation_acknowledgements import (
     acknowledge_issue,
     active_acknowledgements,
@@ -621,6 +631,224 @@ def revert_working_job(job_id: int):
             "status": job.status,
         }
     )
+
+
+def _reprocess_profile(job: Job) -> tuple[str, str | None]:
+    knowledge_root = Path(current_app.config["KNOWLEDGE_ROOT"]).resolve()
+    profile_document = (
+        find_by_title(knowledge_root, job.document_profile)
+        if job.document_profile
+        else None
+    )
+    if profile_document is None:
+        return (
+            job.document_profile or "Generic packing-list mapping.",
+            None,
+        )
+    relative = str(profile_document.relative_to(knowledge_root))
+    return (
+        f"Reprocess using approved document profile: {job.document_profile}. "
+        f"Knowledge path: {relative}.",
+        relative,
+    )
+
+
+def _job_source_chunks(job_id: int):
+    return (
+        SourceChunk.query.join(SourceDocument)
+        .filter(SourceDocument.job_id == job_id)
+        .order_by(SourceChunk.position)
+        .all()
+    )
+
+
+@bp.post("/<int:job_id>/packages/<int:package_index>/reprocess")
+def reprocess_package(job_id: int, package_index: int):
+    job = Job.query.get_or_404(job_id)
+    payload = request.get_json(silent=True) or {}
+    discard_edits = bool(payload.get("discard_edits"))
+
+    if not job.working_json:
+        return jsonify({"error": "This job has no mapped working data."}), 409
+
+    try:
+        packing = load_packing(job.working_json)
+        if package_index < 0 or package_index >= len(packing.packages):
+            raise ReprocessError("Package index is outside the available range.")
+        package = packing.packages[package_index]
+        if has_modifications(package) and not discard_edits:
+            return jsonify(
+                {
+                    "error": (
+                        "This case contains manual working-data changes. "
+                        "Confirm discard_edits to reprocess it."
+                    ),
+                    "requires_confirmation": True,
+                }
+            ), 409
+
+        selected_case = (
+            package.case_number.working.value
+            if package.case_number.working is not None
+            else package.case_number.source.value if package.case_number.source else None
+        )
+        selected_case = str(selected_case).strip() if selected_case not in (None, "") else None
+        source_text = source_text_for_locators(
+            _job_source_chunks(job.id),
+            collect_locators(package),
+        )
+        profile_hint, profile_path = _reprocess_profile(job)
+        remapped = map_packing_list(
+            source_text,
+            profile_hint=profile_hint,
+            profile_path=profile_path,
+        )
+        new_package, _ = find_reprocessed_package(remapped, selected_case)
+
+        before = package.model_dump(mode="json")
+        packing.packages[package_index] = deepcopy(new_package)
+        validate_packing_list(packing)
+
+        source_model = (
+            load_packing(job.source_json)
+            if job.source_json
+            else deepcopy(packing)
+        )
+        if package_index < len(source_model.packages):
+            source_model.packages[package_index] = deepcopy(new_package)
+            validate_packing_list(source_model)
+            job.source_json = dump_packing(source_model)
+
+        _save_working(job, packing)
+        _audit(
+            job.id,
+            "package_reprocessed",
+            f"Reprocessed case {selected_case or package_index + 1}",
+            {
+                "package_index": package_index,
+                "case_number": selected_case,
+                "discarded_manual_edits": discard_edits,
+                "source_locators": sorted(collect_locators(package)),
+                "before": before,
+                "after": new_package.model_dump(mode="json"),
+                "issues": issue_counts(packing),
+            },
+            actor="user",
+        )
+        db.session.commit()
+        return jsonify(
+            {
+                "ok": True,
+                "case_number": selected_case,
+                "issue_counts": issue_counts(packing),
+                "status": job.status,
+            }
+        )
+    except (ReprocessError, MappingError, WorkingDataError, ValueError) as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
+
+
+@bp.post("/<int:job_id>/field/reprocess")
+def reprocess_working_field(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    payload = request.get_json(silent=True) or {}
+    path = str(payload.get("path") or "").strip()
+    discard_edit = bool(payload.get("discard_edit"))
+
+    if not job.working_json:
+        return jsonify({"error": "This job has no mapped working data."}), 409
+
+    try:
+        packing = load_packing(job.working_json)
+        field = get_field(packing, path)
+        if field.modified and not discard_edit:
+            return jsonify(
+                {
+                    "error": (
+                        "This field contains a manual working-data change. "
+                        "Confirm discard_edit to reprocess it."
+                    ),
+                    "requires_confirmation": True,
+                }
+            ), 409
+
+        expected_case = None
+        match = re.match(r"^packages\[(\d+)\]", path)
+        if match:
+            package_index = int(match.group(1))
+            if package_index >= len(packing.packages):
+                raise ReprocessError("Package index is outside the available range.")
+            package = packing.packages[package_index]
+            case_value = (
+                package.case_number.working.value
+                if package.case_number.working is not None
+                else package.case_number.source.value if package.case_number.source else None
+            )
+            expected_case = (
+                str(case_value).strip()
+                if case_value not in (None, "")
+                else None
+            )
+
+        source_text = source_text_for_locators(
+            _job_source_chunks(job.id),
+            collect_locators(field),
+        )
+        profile_hint, profile_path = _reprocess_profile(job)
+        remapped = map_packing_list(
+            source_text,
+            profile_hint=profile_hint,
+            profile_path=profile_path,
+        )
+
+        change = replace_field_from_remap(
+            packing,
+            remapped,
+            path,
+            expected_case=expected_case,
+        )
+        validate_packing_list(packing)
+
+        source_model = (
+            load_packing(job.source_json)
+            if job.source_json
+            else deepcopy(packing)
+        )
+        replace_field_from_remap(
+            source_model,
+            remapped,
+            path,
+            expected_case=expected_case,
+        )
+        validate_packing_list(source_model)
+        job.source_json = dump_packing(source_model)
+
+        _save_working(job, packing)
+        _audit(
+            job.id,
+            "field_reprocessed",
+            f"Reprocessed {path}",
+            {
+                **change,
+                "discarded_manual_edit": discard_edit,
+                "expected_case": expected_case,
+                "issues": issue_counts(packing),
+            },
+            actor="user",
+        )
+        db.session.commit()
+        return jsonify(
+            {
+                "ok": True,
+                "change": change,
+                "issue_counts": issue_counts(packing),
+                "status": job.status,
+            }
+        )
+    except (ReprocessError, MappingError, WorkingDataError, ValueError) as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
 
 
 @bp.post("/<int:job_id>/issues/acknowledge")
