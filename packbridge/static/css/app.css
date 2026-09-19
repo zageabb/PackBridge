@@ -1451,3 +1451,48 @@ body.resizing-assistant {
     text-align: center;
   }
 }
+
+
+/* Optional local authentication */
+.user-pill {
+  background: #eef1f4;
+  color: var(--muted);
+  padding: 6px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.nav-logout {
+  margin: 0;
+}
+.nav-logout button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 5px 0;
+}
+.nav-logout button:hover {
+  color: var(--text);
+}
+.login-shell {
+  min-height: calc(100vh - 150px);
+  display: grid;
+  place-items: center;
+}
+.login-card {
+  width: min(430px, 100%);
+}
+.login-card h1 {
+  margin: 5px 0 8px;
+}
+.login-card > p {
+  margin: 0 0 20px;
+  color: var(--muted);
+}
+.production-generation-bar {
+  margin-top: 12px;
+  border-left: 4px solid var(--accent-2);
+}
