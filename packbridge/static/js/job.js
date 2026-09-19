@@ -23,6 +23,7 @@
   const sourcePageLabel = document.getElementById("source-evidence-page-label");
   const sourceOpenTab = document.getElementById("source-evidence-jump");
   const editorError = document.getElementById("field-editor-error");
+  const reprocessButton = document.getElementById("field-editor-reprocess");
   const revertButton = document.getElementById("field-editor-revert");
   const learnButton = document.getElementById("field-editor-learn");
   const resizeHandle = document.getElementById("assistant-resize-handle");
@@ -371,6 +372,48 @@
     }
   });
 
+  reprocessButton?.addEventListener("click", async () => {
+    clearError();
+    const path = editorPath.value || "";
+    if (!path) return;
+
+    reprocessButton.disabled = true;
+    const original = reprocessButton.textContent;
+    reprocessButton.textContent = "Reprocessing…";
+
+    async function run(discardEdit) {
+      return postJson("/jobs/" + context.id + "/field/reprocess", {
+        path: path,
+        discard_edit: discardEdit
+      });
+    }
+
+    try {
+      await run(false);
+      editor.close();
+      window.location.reload();
+    } catch (error) {
+      if (
+        error.message.includes("manual working-data change") &&
+        window.confirm("This field has a manual edit. Discard that edit and reprocess the field from its retained source evidence?")
+      ) {
+        try {
+          await run(true);
+          editor.close();
+          window.location.reload();
+          return;
+        } catch (retryError) {
+          showError(retryError.message);
+        }
+      } else {
+        showError(error.message);
+      }
+    } finally {
+      reprocessButton.disabled = false;
+      reprocessButton.textContent = original;
+    }
+  });
+
   learnButton?.addEventListener("click", async () => {
     const fieldPath = learnButton.dataset.path || editorPath.value || "";
     if (!fieldPath) return;
@@ -423,6 +466,46 @@
       revertButton.disabled = false;
       revertButton.textContent = original;
     }
+  });
+
+  document.querySelectorAll("[data-reprocess-package]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const index = Number(button.dataset.packageIndex);
+      if (!Number.isInteger(index)) return;
+      button.disabled = true;
+      const original = button.textContent;
+      button.textContent = "Reprocessing…";
+
+      async function run(discardEdits) {
+        return postJson(
+          "/jobs/" + context.id + "/packages/" + index + "/reprocess",
+          {discard_edits: discardEdits}
+        );
+      }
+
+      try {
+        await run(false);
+        window.location.reload();
+      } catch (error) {
+        if (
+          error.message.includes("manual working-data changes") &&
+          window.confirm("This case contains manual edits. Discard those edits and remap the case from retained source evidence?")
+        ) {
+          try {
+            await run(true);
+            window.location.reload();
+            return;
+          } catch (retryError) {
+            window.alert(retryError.message);
+          }
+        } else {
+          window.alert(error.message);
+        }
+      } finally {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    });
   });
 
   document.querySelectorAll("[data-revert-package]").forEach((button) => {
