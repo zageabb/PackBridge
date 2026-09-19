@@ -1,0 +1,39 @@
+{
+  "packages": [
+    {
+      "case_number": "PKG-A1",
+      "gross_weight": 1250,
+      "net_weight": 1110,
+      "length": 2.4,
+      "width": 1.1,
+      "height": 1.3,
+      "items": [
+        {
+          "item_number": "NS-10",
+          "description": "Transformer accessory set",
+          "quantity": 4,
+          "uom": "SET"
+        }
+      ]
+    },
+    {
+      "case_number": "PKG-A2",
+      "gross_weight": 620,
+      "net_weight": 570,
+      "length": 1.8,
+      "width": 1,
+      "height": 0.9,
+      "items": [
+        {
+          "item_number": "NS-20",
+          "description": "Cable termination kit",
+          "quantity": 6,
+          "uom": "KIT"
+        }
+      ]
+    }
+  ],
+  "must_be_null": [
+    "shipment.country_of_origin"
+  ]
+}
