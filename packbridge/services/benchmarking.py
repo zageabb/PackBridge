@@ -14,6 +14,7 @@ from packbridge.services.ollama_client import OllamaClient
 @dataclass
 class CaseMetrics:
     name: str
+    mapped_ok: bool
     elapsed_seconds: float
     package_count_expected: int
     package_count_actual: int
@@ -156,6 +157,7 @@ def compare_expected(name: str, packing: PackingList, expected: dict, elapsed: f
 
     return CaseMetrics(
         name=name,
+        mapped_ok=True,
         elapsed_seconds=elapsed,
         package_count_expected=len(expected_packages),
         package_count_actual=len(packing.packages),
@@ -200,14 +202,48 @@ def run_benchmark(
 
     for name, source, expected in load_golden_cases(root):
         started = time.perf_counter()
-        packing = map_packing_list(source, mapper_client=benchmark_client)
-        elapsed = time.perf_counter() - started
-        metrics.append(compare_expected(name, packing, expected, elapsed))
+        try:
+            packing = map_packing_list(source, mapper_client=benchmark_client)
+            elapsed = time.perf_counter() - started
+            metrics.append(compare_expected(name, packing, expected, elapsed))
+        except Exception as exc:
+            elapsed = time.perf_counter() - started
+            expected_packages = expected.get("packages") or []
+            metrics.append(
+                CaseMetrics(
+                    name=name,
+                    mapped_ok=False,
+                    elapsed_seconds=elapsed,
+                    package_count_expected=len(expected_packages),
+                    package_count_actual=0,
+                    package_count_correct=False,
+                    case_set_correct=False,
+                    field_correct=0,
+                    field_total=sum(
+                        sum(
+                            field in package
+                            for field in (
+                                "gross_weight", "net_weight", "length", "width",
+                                "height", "package_type", "internal_reference",
+                            )
+                        )
+                        for package in expected_packages
+                    ),
+                    item_correct=0,
+                    item_total=sum(len(package.get("items") or []) for package in expected_packages),
+                    null_correct=0,
+                    null_total=len(expected.get("must_be_null") or []),
+                    errors=[f"Mapper failed: {exc}"],
+                )
+            )
 
     aggregate = {
         "model": model,
         "case_count": len(metrics),
-        "json_validity_rate": 1.0 if metrics else 0.0,
+        "json_validity_rate": (
+            sum(item.mapped_ok for item in metrics) / len(metrics)
+            if metrics else 0.0
+        ),
         "package_grouping_rate": (
             sum(item.package_count_correct and item.case_set_correct for item in metrics) / len(metrics)
             if metrics else 0.0
