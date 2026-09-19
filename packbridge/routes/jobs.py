@@ -198,7 +198,11 @@ def upload():
             {"sha256": digest, "size_bytes": size},
         )
 
-        extracted = extract_path(path)
+        extracted = extract_path(
+            path,
+            ocr_mode=current_app.config.get("OCR_MODE", "off"),
+            ocr_language=current_app.config.get("OCR_LANGUAGE", "eng"),
+        )
         document.page_count = extracted.page_count
         document.extraction_status = "complete"
         for chunk in extracted.chunks:
