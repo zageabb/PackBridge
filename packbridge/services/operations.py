@@ -221,3 +221,30 @@ def apply_retention(
         for item in candidates:
             shutil.rmtree(item.path)
     return candidates
+
+
+
+def prune_backups(
+    backup_root: Path,
+    *,
+    days: int,
+    dry_run: bool = True,
+    now: datetime | None = None,
+) -> list[Path]:
+    if days <= 0:
+        return []
+    root = Path(backup_root)
+    if not root.is_dir():
+        return []
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=days)
+    candidates = []
+    for path in root.glob("*.zip"):
+        modified = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        if modified < cutoff:
+            candidates.append(path)
+    candidates = sorted(candidates)
+    if not dry_run:
+        for path in candidates:
+            path.unlink(missing_ok=True)
+    return candidates
