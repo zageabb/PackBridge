@@ -83,7 +83,7 @@ Daily backup and weekly retention systemd timer examples are provided under depl
 
 ## Retention
 
-Default operational-file retention is 90 days and backup retention is 30 days. Database audit history is not deleted by the file-retention command.
+Automatic deletion is disabled by default (`PACKBRIDGE_RETENTION_DAYS=0` and `PACKBRIDGE_BACKUP_RETENTION_DAYS=0`). The production owner must set retention periods only after the business/data-retention policy is agreed. Database audit history is not deleted by the file-retention command.
 
 Preview cleanup:
 
