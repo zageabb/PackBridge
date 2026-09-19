@@ -1,0 +1,12 @@
+[Sheet: Packing]
+ACME Engineering - Shipment Packing List
+Customer PO: PO-440012
+Crate ID: CR-77
+Packing method: Wooden crate
+Size (cm): Length 120 / Width 80 / Height 95
+Shipping Mass: 410 kg
+Equipment Mass: 365 kg
+Customer Project:
+
+Line | Part No | Product description | Qty | Unit
+1 | AC-500 | Control cabinet | 1 | EA
