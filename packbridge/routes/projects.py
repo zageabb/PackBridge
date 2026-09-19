@@ -89,15 +89,33 @@ def view(project_id: int):
     inputs = _mapped_inputs(project)
     preview = build_project_preview(inputs, context)
     template = active_template(current_app.config["TEMPLATE_ROOT"])
-    generation_ready = bool(
+    inspection = (template or {}).get("inspection") or {}
+    base_generation_ready = bool(
         preview.rows
         and not preview.blocking
         and not preview.warnings
         and template
         and template.get("available")
-        and (template.get("inspection") or {}).get("generation_ready")
-        and (template.get("inspection") or {}).get("has_vba")
+        and inspection.get("generation_ready")
     )
+    generation_ready = bool(
+        base_generation_ready
+        and inspection.get("has_vba")
+    )
+    production_ready = bool(
+        base_generation_ready
+        and current_app.config.get("SAP_OUTPUT_APPROVED", False)
+        and current_app.config.get("SAP_SOCS_ONLY_APPROVED", False)
+        and (
+            inspection.get("has_vba")
+            or current_app.config.get("SAP_MACRO_FREE_APPROVED", False)
+        )
+    )
+    production_gates = {
+        "sap_output_approved": bool(current_app.config.get("SAP_OUTPUT_APPROVED", False)),
+        "socs_only_approved": bool(current_app.config.get("SAP_SOCS_ONLY_APPROVED", False)),
+        "macro_free_approved": bool(current_app.config.get("SAP_MACRO_FREE_APPROVED", False)),
+    }
 
     attached_job_ids = {link.job_id for link in project.job_links}
     linked_elsewhere = {
@@ -126,6 +144,8 @@ def view(project_id: int):
         total_packages=len(preview.rows),
         template=template,
         generation_ready=generation_ready,
+        production_ready=production_ready,
+        production_gates=production_gates,
     )
 
 
@@ -302,6 +322,104 @@ def build_validation_workbook(project_id: int):
     return redirect(url_for("projects.view", project_id=project.id) + "#outputs")
 
 
+@bp.post("/<int:project_id>/build-production")
+def build_production_workbook(project_id: int):
+    project = SSDProject.query.get_or_404(project_id)
+    if not current_app.config.get("SAP_OUTPUT_APPROVED", False):
+        flash("Production SSD output is locked until SAP acceptance is recorded in deployment configuration.", "danger")
+        return redirect(url_for("projects.view", project_id=project.id) + "#outputs")
+    if not current_app.config.get("SAP_SOCS_ONLY_APPROVED", False):
+        flash(
+            "Production output is locked until the business confirms that the deterministic SoCs output is sufficient for the SAP import path.",
+            "danger",
+        )
+        return redirect(url_for("projects.view", project_id=project.id) + "#outputs")
+
+    context = _context(project)
+    preview = build_project_preview(_mapped_inputs(project), context)
+    template = active_template(current_app.config["TEMPLATE_ROOT"])
+
+    if not preview.rows:
+        flash("Attach at least one mapped packing-list job before generating an SSD.", "danger")
+        return redirect(url_for("projects.view", project_id=project.id) + "#outputs")
+    if preview.blocking or preview.warnings:
+        flash("Resolve all SSD preview blockers and warnings before production generation.", "danger")
+        return redirect(url_for("projects.view", project_id=project.id) + "#project-preview")
+    if not template or not template.get("available"):
+        flash("Install a controlled SSD template first.", "danger")
+        return redirect(url_for("settings.index"))
+
+    inspection = template.get("inspection") or {}
+    if not inspection.get("generation_ready"):
+        flash("The active SSD template is not a clean generation template.", "danger")
+        return redirect(url_for("settings.index"))
+    if (
+        not inspection.get("has_vba")
+        and not current_app.config.get("SAP_MACRO_FREE_APPROVED", False)
+    ):
+        flash(
+            "The active template is macro-free, but macro-free SAP output has not been approved.",
+            "danger",
+        )
+        return redirect(url_for("settings.index"))
+
+    output_root = (
+        Path(current_app.config["DATA_ROOT"])
+        / "ssd-projects"
+        / str(project.id)
+        / "output"
+    )
+    output_root.mkdir(parents=True, exist_ok=True)
+    safe_reference = "".join(
+        character if character.isalnum() or character in "-_" else "-"
+        for character in (project.reference or project.name)
+    ).strip("-_") or f"project-{project.id}"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    suffix = Path(template["path"]).suffix.casefold() or (
+        ".xlsx" if current_app.config.get("SAP_MACRO_FREE_APPROVED", False) else ".xlsm"
+    )
+    filename = f"PackBridge-{safe_reference}-{timestamp}{suffix}"
+    destination = output_root / filename
+
+    try:
+        result = write_socs_preview(
+            template["path"],
+            destination,
+            preview,
+            require_vba=not current_app.config.get("SAP_MACRO_FREE_APPROVED", False),
+        )
+    except (SSDWriterError, OSError, ValueError) as exc:
+        flash(f"Production SSD was not created: {exc}", "danger")
+        return redirect(url_for("projects.view", project_id=project.id) + "#outputs")
+
+    record = SSDOutputRecord(
+        project_id=project.id,
+        output_type="production",
+        filename=filename,
+        path=str(destination),
+        sha256=result["sha256"],
+        template_sha256=str(template.get("sha256") or ""),
+        structural_fingerprint=result["structural_fingerprint"],
+        rows_written=result["rows_written"],
+        cells_written=result["cells_written"],
+        status="production-verified",
+    )
+    db.session.add(record)
+    db.session.commit()
+    current_app.logger.info(
+        "Production SSD generated project_id=%s output_id=%s sha256=%s template_sha256=%s",
+        project.id,
+        record.id,
+        record.sha256,
+        record.template_sha256,
+    )
+    flash(
+        "Production SSD generated and structurally/value verified.",
+        "success",
+    )
+    return redirect(url_for("projects.view", project_id=project.id) + "#outputs")
+
+
 @bp.get("/<int:project_id>/outputs/<int:output_id>/download")
 def download_output(project_id: int, output_id: int):
     project = SSDProject.query.get_or_404(project_id)
@@ -317,9 +435,14 @@ def download_output(project_id: int, output_id: int):
     if not path.is_file():
         abort(404)
 
+    mimetype = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        if path.suffix.casefold() == ".xlsx"
+        else "application/vnd.ms-excel.sheet.macroEnabled.12"
+    )
     return send_file(
         path,
         as_attachment=True,
         download_name=record.filename,
-        mimetype="application/vnd.ms-excel.sheet.macroEnabled.12",
+        mimetype=mimetype,
     )
