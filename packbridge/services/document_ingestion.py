@@ -11,6 +11,8 @@ from docx import Document
 from openpyxl import load_workbook
 from pypdf import PdfReader
 
+from .local_ocr import LocalOCRError, ocr_pdf_bytes
+
 
 ALLOWED_EXTENSIONS = {".txt", ".md", ".markdown", ".csv", ".pdf", ".docx", ".xlsx", ".xlsm"}
 MAX_EXTRACTED_CHARS = 2_000_000
@@ -99,7 +101,12 @@ def _chunks_from_text(locator: str, text: str, start_position: int) -> list[Extr
     return chunks
 
 
-def extract_path(path: str | Path) -> ExtractedDocument:
+def extract_path(
+    path: str | Path,
+    *,
+    ocr_mode: str = "off",
+    ocr_language: str = "eng",
+) -> ExtractedDocument:
     path = Path(path)
     suffix = path.suffix.casefold()
     if suffix not in ALLOWED_EXTENSIONS:
@@ -111,7 +118,33 @@ def extract_path(path: str | Path) -> ExtractedDocument:
         raise DocumentIngestionError("The uploaded document is empty.")
 
     if suffix == ".pdf":
-        return _extract_pdf(payload)
+        try:
+            return _extract_pdf(payload)
+        except DocumentIngestionError as exc:
+            if ocr_mode.casefold() != "tesseract":
+                raise
+            try:
+                pages = ocr_pdf_bytes(payload, language=ocr_language)
+            except LocalOCRError as ocr_exc:
+                raise DocumentIngestionError(str(ocr_exc)) from ocr_exc
+            chunks: list[ExtractedChunk] = []
+            for page_number, text in pages:
+                chunks.extend(
+                    _chunks_from_text(
+                        f"Page {page_number}, OCR",
+                        text,
+                        len(chunks) + 1,
+                    )
+                )
+            if not chunks:
+                raise DocumentIngestionError(
+                    "Local OCR did not find readable text in this PDF."
+                ) from exc
+            return ExtractedDocument(
+                ".pdf",
+                chunks,
+                page_count=max(page for page, _ in pages),
+            )
     if suffix in {".docx", ".xlsx", ".xlsm"}:
         _validate_office_container(payload)
     if suffix == ".docx":
