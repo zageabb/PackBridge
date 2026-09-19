@@ -9,6 +9,8 @@ from flask import Flask
 
 from packbridge.extensions import db
 from packbridge.services.auth import password_hash, role_options
+from packbridge.services.benchmarking import run_benchmark
+from packbridge.services import runtime_settings
 from packbridge.services.operations import (
     apply_retention,
     create_backup,
@@ -142,3 +144,76 @@ def register_cli(app: Flask) -> None:
             f"{'Removed' if do_apply else 'Would remove'} {len(candidates)} folder(s) "
             f"older than {policy_days} day(s)."
         )
+
+    @packbridge_group.command("benchmark")
+    @click.option("--model", required=True, help="Ollama model name, for example qwen3:14b.")
+    @click.option("--base-url", default=None, help="Override configured Ollama URL.")
+    @click.option("--golden-root", type=click.Path(path_type=Path), default=None)
+    @click.option("--output", type=click.Path(path_type=Path), default=None)
+    def benchmark(model: str, base_url: str | None, golden_root: Path | None, output: Path | None):
+        """Run the controlled golden-document benchmark against one local model."""
+
+        settings = runtime_settings.current()
+        root = golden_root or (Path(app.root_path).parent / "benchmarks" / "golden")
+        if not root.is_dir():
+            raise click.ClickException(f"Golden benchmark directory does not exist: {root}")
+
+        report = run_benchmark(
+            root=root,
+            base_url=(base_url or settings["ollama_url"]),
+            model=model,
+        )
+        if output is None:
+            result_root = Path(app.config["DATA_ROOT"]) / "benchmarks"
+            result_root.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            safe_model = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in model)
+            output = result_root / f"{safe_model}-{stamp}.json"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+
+        aggregate = report["aggregate"]
+        click.echo(json.dumps(aggregate, indent=2))
+        click.echo(f"Report: {output}")
+
+        passed = (
+            aggregate["json_validity_rate"] == 1.0
+            and aggregate["package_grouping_rate"] == 1.0
+            and aggregate["null_preservation_rate"] == 1.0
+            and aggregate["field_accuracy"] >= 0.99
+            and aggregate["item_accuracy"] >= 0.99
+        )
+        if not passed:
+            raise click.ClickException("Model did not meet PackBridge acceptance thresholds.")
+
+    @packbridge_group.command("benchmark-compare")
+    @click.argument("baseline", type=click.Path(exists=True, path_type=Path))
+    @click.argument("candidate", type=click.Path(exists=True, path_type=Path))
+    def benchmark_compare(baseline: Path, candidate: Path):
+        """Compare a smaller candidate model with the approved baseline."""
+
+        left = json.loads(baseline.read_text(encoding="utf-8"))["aggregate"]
+        right = json.loads(candidate.read_text(encoding="utf-8"))["aggregate"]
+
+        qualifies = (
+            right["json_validity_rate"] == 1.0
+            and right["package_grouping_rate"] == 1.0
+            and right["null_preservation_rate"] == 1.0
+            and right["field_accuracy"] >= max(0.99, left["field_accuracy"] - 0.005)
+            and right["item_accuracy"] >= max(0.99, left["item_accuracy"] - 0.005)
+        )
+        comparison = {
+            "baseline": left,
+            "candidate": right,
+            "candidate_meets_quality_gate": qualifies,
+            "candidate_speedup": (
+                left["average_seconds"] / right["average_seconds"]
+                if right["average_seconds"] > 0
+                else None
+            ),
+        }
+        click.echo(json.dumps(comparison, indent=2))
+        if not qualifies:
+            raise click.ClickException(
+                "Candidate model does not meet the PackBridge quality gate."
+            )
