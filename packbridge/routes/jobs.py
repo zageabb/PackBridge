@@ -443,12 +443,17 @@ def process(job_id: int):
                 {"action": "generic_mapper", "learning_recommended": True},
             )
 
+    active_client = ollama_client()
     job.status = "processing"
     _audit(
         job.id,
         "mapping_started",
-        "Local document mapping started",
-        {"profile_hint": profile_hint},
+        f"Document mapping started with {active_client.model}",
+        {
+            "profile_hint": profile_hint,
+            "model": active_client.model,
+            "ollama_url": active_client.base_url,
+        },
     )
     db.session.commit()
 
@@ -476,6 +481,7 @@ def process(job_id: int):
             profile_hint=profile_hint,
             profile_path=profile_match.path if profile_match else None,
             progress_callback=progress,
+            mapper_client=active_client,
         )
         payload = packing.model_dump_json()
         job.source_json = payload
@@ -492,7 +498,7 @@ def process(job_id: int):
             f"Mapped {len(packing.packages)} package(s)",
             {
                 "packages": len(packing.packages),
-                "model": ollama_client().model,
+                "model": active_client.model,
                 "issues": issue_counts(packing),
             },
         )
@@ -540,11 +546,14 @@ def processing_status(job_id: int):
         .limit(8)
         .all()
     )
+    active_client = ollama_client()
     return jsonify(
         {
             "job_id": job.id,
             "status": job.status,
             "error": job.error_message,
+            "active_model": active_client.model,
+            "ollama_url": active_client.base_url,
             "events": [
                 {
                     "type": event.event_type,
