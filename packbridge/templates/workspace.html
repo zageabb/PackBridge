@@ -50,6 +50,7 @@
           <th>Vendor</th>
           <th>Status</th>
           <th>Created</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -60,6 +61,15 @@
           <td>{{ job.vendor or "—" }}</td>
           <td><span class="status status-{{ job.status|replace('_','-') }}">{{ job.status|replace('_',' ') }}</span></td>
           <td>{{ job.created_at.strftime("%d %b %Y %H:%M") }}</td>
+          <td class="job-actions-cell">
+            {% if job.status in ['failed', 'mapping_failed'] and packbridge_can('process') %}
+              <form method="post" action="{{ url_for('jobs.delete_failed', job_id=job.id) }}" data-delete-failed-job>
+                <button class="btn btn-danger btn-small" type="submit">Delete</button>
+              </form>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -78,8 +88,16 @@
 <script>
 document.querySelectorAll(".click-row").forEach((row) => {
   row.addEventListener("click", (event) => {
-    if (event.target.closest("a")) return;
+    if (event.target.closest("a, button, form")) return;
     window.location.href = row.dataset.href;
+  });
+});
+
+document.querySelectorAll("[data-delete-failed-job]").forEach((form) => {
+  form.addEventListener("submit", (event) => {
+    if (!window.confirm("Delete this failed job and its stored source/working files? This cannot be undone.")) {
+      event.preventDefault();
+    }
   });
 });
 
