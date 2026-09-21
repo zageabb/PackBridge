@@ -105,6 +105,11 @@
         {% if packing %}
           <button class="btn btn-secondary" type="button" data-revert-job>Revert all edits</button>
         {% endif %}
+        {% if can_delete_failed and packbridge_can('process') %}
+        <form method="post" action="{{ url_for('jobs.delete_failed', job_id=job.id) }}" onsubmit="return window.confirm('Delete this failed job and its stored files? This cannot be undone.');">
+          <button class="btn btn-danger" type="submit">Delete failed job</button>
+        </form>
+        {% endif %}
         {% if job.status in ["extracted", "mapping_failed"] %}
         <form method="post" action="{{ url_for('jobs.process', job_id=job.id) }}" class="process-form" id="process-form">
           <input type="text" name="profile_hint" placeholder="Optional vendor/profile hint">
@@ -146,7 +151,13 @@
       </div>
       <div class="processing-progress-bar"><span id="processing-progress-bar"></span></div>
       <div class="processing-progress-events" id="processing-progress-events"></div>
-      <p class="muted">This runs entirely through the configured local Ollama service. You can leave the assistant panel open while processing.</p>
+      <p class="muted">
+        {% if active_model_is_cloud %}
+          This job is using a cloud-tagged Ollama model for faster inference. Source text sent to that model may leave the local host.
+        {% else %}
+          This runs through the configured local Ollama model. You can leave the assistant panel open while processing.
+        {% endif %}
+      </p>
     </section>
 
     {% if packing %}
