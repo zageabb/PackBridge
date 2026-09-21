@@ -362,6 +362,15 @@ class OllamaClient:
         text = self._extract_json_text(content)
         try:
             parsed = json.loads(text)
+            # Some provider-backed Ollama models return a JSON string whose
+            # contents are the actual JSON object. Unwrap at most two layers.
+            for _ in range(2):
+                if not isinstance(parsed, str):
+                    break
+                candidate = parsed.strip()
+                if not candidate or candidate[0] not in "[{":
+                    break
+                parsed = json.loads(candidate)
         except (json.JSONDecodeError, TypeError, ValueError):
             if allow_repair and response_model is not None:
                 return self._repair_structured_json(
