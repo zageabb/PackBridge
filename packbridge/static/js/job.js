@@ -32,6 +32,7 @@
   const progressTitle = document.getElementById("processing-progress-title");
   const progressBar = document.getElementById("processing-progress-bar");
   const progressEvents = document.getElementById("processing-progress-events");
+  const processingModelPill = document.getElementById("processing-model-pill");
 
   function processingPercent(event, status) {
     if (status === "mapped") return 100;
@@ -57,6 +58,9 @@
 
   function renderProcessingStatus(payload) {
     if (!progressPanel) return;
+    if (processingModelPill && payload.active_model) {
+      processingModelPill.textContent = payload.active_model;
+    }
     const events = payload.events || [];
     const latest = events.length ? events[events.length - 1] : null;
     const percent = processingPercent(latest, payload.status);
