@@ -274,8 +274,18 @@ class OllamaClient:
         system_prompt: str = "",
     ) -> OllamaResult:
         bounded = []
-        if system_prompt:
-            bounded.append({"role": "system", "content": system_prompt[:45_000]})
+        response_format: str | dict = response_model.model_json_schema()
+        effective_system = system_prompt
+
+        if self._cloud_tagged():
+            response_format = "json"
+            effective_system = self._schema_instruction(
+                system_prompt or "Return the requested structured response.",
+                response_model,
+            )
+
+        if effective_system:
+            bounded.append({"role": "system", "content": effective_system[:45_000]})
         for message in messages[-24:]:
             role = str(message.get("role") or "user")
             msg_content = str(message.get("content") or "")[:30_000]
@@ -287,7 +297,7 @@ class OllamaClient:
                 "model": self.model,
                 "messages": bounded,
                 "stream": False,
-                "format": response_model.model_json_schema(),
+                "format": response_format,
                 "options": {"temperature": 0},
             },
         )
@@ -295,7 +305,12 @@ class OllamaClient:
             return result
         message = result.value.get("message")
         msg_content = message.get("content") if isinstance(message, dict) else None
-        return self._parse_json(result, msg_content, response_model)
+        return self._parse_json(
+            result,
+            msg_content,
+            response_model,
+            original_prompt=effective_system,
+        )
 
     def _request(
         self,
