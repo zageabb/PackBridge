@@ -371,6 +371,7 @@ def view(job_id: int):
         profile_knowledge_path=profile_knowledge_path,
         learning_recommended=learning_recommended,
         active_ollama_model=ollama_client().model,
+        active_model_is_cloud=("cloud" in ollama_client().model.casefold()),
         last_mapping_model=last_mapping_model,
         can_delete_failed=can_delete_failed_job(job),
         selected_ssd_override=(
