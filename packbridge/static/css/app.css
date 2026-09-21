@@ -1508,3 +1508,15 @@ body.resizing-assistant {
 .job-model-trace strong {
   color: var(--text);
 }
+
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(.92);
+}
+.job-actions-cell form {
+  margin: 0;
+}
