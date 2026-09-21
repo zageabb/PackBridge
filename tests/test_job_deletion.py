@@ -83,3 +83,51 @@ def test_job_file_cleanup_only_removes_selected_job_folder(tmp_path):
 
     assert not target.exists()
     assert other.exists()
+
+
+
+def test_failed_job_delete_route_removes_database_record_and_job_files(tmp_path):
+    app = make_app(tmp_path)
+
+    with app.app_context():
+        job = Job(title="Failed mapper", status="mapping_failed", error_message="bad model")
+        db.session.add(job)
+        db.session.commit()
+        job_id = job.id
+
+    job_dir = tmp_path / "data" / "jobs" / str(job_id)
+    job_dir.mkdir(parents=True)
+    (job_dir / "leftover.txt").write_text("x", encoding="utf-8")
+
+    response = app.test_client().post(
+        f"/jobs/{job_id}/delete-failed",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Deleted failed job" in response.data
+    assert not job_dir.exists()
+
+    with app.app_context():
+        assert db.session.get(Job, job_id) is None
+
+
+def test_mapped_job_delete_route_is_rejected(tmp_path):
+    app = make_app(tmp_path)
+
+    with app.app_context():
+        job = Job(title="Keep me", status="mapped")
+        db.session.add(job)
+        db.session.commit()
+        job_id = job.id
+
+    response = app.test_client().post(
+        f"/jobs/{job_id}/delete-failed",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Only jobs in failed or mapping_failed state" in response.data
+
+    with app.app_context():
+        assert db.session.get(Job, job_id) is not None
