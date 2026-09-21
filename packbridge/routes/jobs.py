@@ -277,6 +277,17 @@ def view(job_id: int):
         .limit(30)
         .all()
     )
+    last_mapping_model = None
+    latest_mapping_event = (
+        AuditEvent.query.filter_by(job_id=job.id, event_type="mapping_completed")
+        .order_by(AuditEvent.id.desc())
+        .first()
+    )
+    if latest_mapping_event and latest_mapping_event.payload_json:
+        try:
+            last_mapping_model = (json.loads(latest_mapping_event.payload_json) or {}).get("model")
+        except json.JSONDecodeError:
+            last_mapping_model = None
     profile_knowledge_path = None
     if job.document_profile:
         profile_document = find_by_title(
@@ -312,6 +323,7 @@ def view(job_id: int):
         profile_knowledge_path=profile_knowledge_path,
         learning_recommended=learning_recommended,
         active_ollama_model=ollama_client().model,
+        last_mapping_model=last_mapping_model,
         selected_ssd_override=(
             ssd_context.case_overrides.get(
                 str((((selected or {}).get("case_number") or {}).get("working") or {}).get("value") or "")
