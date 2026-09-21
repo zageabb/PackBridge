@@ -103,10 +103,35 @@ def test_cloud_model_scalar_shorthand_is_normalised_to_mapper_schema():
 def test_double_encoded_json_is_unwrapped_before_schema_validation():
     session = FakeSession(
         {
-            "response": '" + JSON.stringify('{"message":"Done","proposed_changes":[],"data_queries":[]}') + "'
+            "response": '"{\"vendor\":\"ACME\",\"packages\":[]}"'
         }
     )
-    client = OllamaClient("http://localhost:11434", "gpt-oss:120b-cloud", session=session)
+    client = OllamaClient(
+        "http://localhost:11434",
+        "gpt-oss:120b-cloud",
+        session=session,
+    )
+
+    result = client.generate_json("Map this packing list", MapperResult)
+
+    assert result.available is True
+    assert result.value.vendor == "ACME"
+    assert result.value.packages == []
+
+
+def test_cloud_chat_uses_json_mode_with_explicit_schema_instruction():
+    session = FakeSession(
+        {
+            "message": {
+                "content": '{"message":"Done","proposed_changes":[]}'
+            }
+        }
+    )
+    client = OllamaClient(
+        "http://localhost:11434",
+        "gpt-oss:120b-cloud",
+        session=session,
+    )
 
     result = client.chat_json(
         [{"role": "user", "content": "Hello"}],
@@ -116,3 +141,5 @@ def test_double_encoded_json_is_unwrapped_before_schema_validation():
 
     assert result.available is True
     assert result.value.message == "Done"
+    assert session.last_json["format"] == "json"
+    assert "IMPORTANT STRUCTURED OUTPUT REQUIREMENT" in session.last_json["messages"][0]["content"]
