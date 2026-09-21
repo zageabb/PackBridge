@@ -24,14 +24,14 @@
       {% endif %}
     </div>
 
-    <form method="post" action="{{ url_for('settings.update') }}" class="form-stack">
+    <form method="post" action="{{ url_for('settings.update') }}" class="form-stack" id="ollama-settings-form">
       <label>
         <span>Ollama URL</span>
-        <input type="text" name="ollama_url" value="{{ values.ollama_url }}" required>
+        <input type="text" id="ollama-url" name="ollama_url" value="{{ values.ollama_url }}" required>
       </label>
       <label>
         <span>Model</span>
-        <input list="ollama-models" type="text" name="ollama_model" value="{{ values.ollama_model }}" required>
+        <input list="ollama-models" id="ollama-model" type="text" name="ollama_model" value="{{ values.ollama_model }}" required>
         <datalist id="ollama-models">
           {% for model in connection.models or [] %}
           <option value="{{ model }}"></option>
@@ -43,11 +43,12 @@
       </div>
     </form>
 
-    <form method="post" action="{{ url_for('settings.test') }}" class="inline-test-form">
-      <input type="hidden" name="ollama_url" value="{{ values.ollama_url }}">
-      <input type="hidden" name="ollama_model" value="{{ values.ollama_model }}">
-      <button class="btn btn-secondary" type="submit">Test current connection</button>
+    <form method="post" action="{{ url_for('settings.test') }}" class="inline-test-form" id="ollama-test-form">
+      <input type="hidden" id="ollama-test-url" name="ollama_url" value="{{ values.ollama_url }}">
+      <input type="hidden" id="ollama-test-model" name="ollama_model" value="{{ values.ollama_model }}">
+      <button class="btn btn-secondary" type="submit">Test entered model</button>
     </form>
+    <p class="muted">The Test button now tests the values currently typed above, even before you save them.</p>
   </section>
 
   <section class="card">
@@ -157,4 +158,20 @@
     </div>
   </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const testForm = document.getElementById("ollama-test-form");
+  const url = document.getElementById("ollama-url");
+  const model = document.getElementById("ollama-model");
+  const testUrl = document.getElementById("ollama-test-url");
+  const testModel = document.getElementById("ollama-test-model");
+  testForm?.addEventListener("submit", () => {
+    if (testUrl && url) testUrl.value = url.value;
+    if (testModel && model) testModel.value = model.value;
+  });
+})();
+</script>
 {% endblock %}
