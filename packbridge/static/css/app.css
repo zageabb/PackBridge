@@ -1496,3 +1496,15 @@ body.resizing-assistant {
   margin-top: 12px;
   border-left: 4px solid var(--accent-2);
 }
+
+.job-model-trace {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.job-model-trace strong {
+  color: var(--text);
+}
