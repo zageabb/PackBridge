@@ -41,6 +41,12 @@ from packbridge.services.document_ingestion import (
     DocumentIngestionError,
     extract_path,
 )
+from packbridge.services.job_deletion import (
+    JobDeletionError,
+    can_delete_failed_job,
+    delete_failed_job,
+    delete_job_files,
+)
 from packbridge.services.knowledge import find_by_title
 from packbridge.services.knowledge_governance import (
     KnowledgeGovernanceError,
@@ -243,6 +249,48 @@ def upload():
         return redirect(url_for("jobs.view", job_id=job.id))
 
 
+@bp.post("/<int:job_id>/delete-failed")
+def delete_failed(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    title = job.title
+    status = job.status
+
+    try:
+        delete_failed_job(job)
+        db.session.commit()
+    except JobDeletionError as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+        return redirect(url_for("main.index"))
+
+    cleanup_warning = None
+    try:
+        delete_job_files(Path(current_app.config["DATA_ROOT"]), job_id)
+    except (JobDeletionError, OSError) as exc:
+        cleanup_warning = str(exc)
+        current_app.logger.warning(
+            "Failed-job database record deleted but file cleanup failed job_id=%s error=%s",
+            job_id,
+            exc,
+        )
+
+    current_app.logger.info(
+        "Failed PackBridge job deleted job_id=%s title=%s previous_status=%s",
+        job_id,
+        title,
+        status,
+    )
+
+    if cleanup_warning:
+        flash(
+            f"Failed job {job_id} was deleted, but its stored files could not be fully removed: {cleanup_warning}",
+            "warning",
+        )
+    else:
+        flash(f"Deleted failed job {job_id}: {title}.", "success")
+    return redirect(url_for("main.index"))
+
+
 @bp.get("/<int:job_id>")
 def view(job_id: int):
     job = Job.query.get_or_404(job_id)
@@ -324,6 +372,7 @@ def view(job_id: int):
         learning_recommended=learning_recommended,
         active_ollama_model=ollama_client().model,
         last_mapping_model=last_mapping_model,
+        can_delete_failed=can_delete_failed_job(job),
         selected_ssd_override=(
             ssd_context.case_overrides.get(
                 str((((selected or {}).get("case_number") or {}).get("working") or {}).get("value") or "")
