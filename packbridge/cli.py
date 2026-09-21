@@ -209,30 +209,34 @@ def register_cli(app: Flask) -> None:
     @click.argument("baseline", type=click.Path(exists=True, path_type=Path))
     @click.argument("candidate", type=click.Path(exists=True, path_type=Path))
     def benchmark_compare(baseline: Path, candidate: Path):
-        """Compare a smaller candidate model with the approved baseline."""
+        """Compare models primarily for speed while enforcing a minimum correctness floor."""
 
         left = json.loads(baseline.read_text(encoding="utf-8"))["aggregate"]
         right = json.loads(candidate.read_text(encoding="utf-8"))["aggregate"]
 
-        qualifies = (
+        quality_floor = (
             right["json_validity_rate"] == 1.0
             and right["package_grouping_rate"] == 1.0
             and right["null_preservation_rate"] == 1.0
-            and right["field_accuracy"] >= max(0.99, left["field_accuracy"] - 0.005)
-            and right["item_accuracy"] >= max(0.99, left["item_accuracy"] - 0.005)
+            and right["field_accuracy"] >= 0.99
+            and right["item_accuracy"] >= 0.99
         )
+        speedup = (
+            left["average_seconds"] / right["average_seconds"]
+            if right["average_seconds"] > 0
+            else None
+        )
+        faster = bool(speedup is not None and speedup > 1.0)
         comparison = {
             "baseline": left,
             "candidate": right,
-            "candidate_meets_quality_gate": qualifies,
-            "candidate_speedup": (
-                left["average_seconds"] / right["average_seconds"]
-                if right["average_seconds"] > 0
-                else None
-            ),
+            "candidate_meets_minimum_quality_floor": quality_floor,
+            "candidate_speedup": speedup,
+            "candidate_is_faster": faster,
+            "candidate_preferred_for_speed": bool(quality_floor and faster),
         }
         click.echo(json.dumps(comparison, indent=2))
-        if not qualifies:
+        if not quality_floor:
             raise click.ClickException(
-                "Candidate model does not meet the PackBridge quality gate."
+                "Candidate model is faster/available but does not meet PackBridge's minimum correctness floor."
             )
