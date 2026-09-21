@@ -15,7 +15,13 @@
     <div class="section-heading">
       <div>
         <h2>Ollama connection</h2>
-        <p>Baseline mapper model: <code>qwen3:14b</code>. The selected model is used for the next map, reprocess, Learning draft or assistant request; changing it does not rewrite jobs that were already mapped.</p>
+        <p>Local baseline: <code>qwen3:14b</code>. Model switching is primarily a <strong>speed choice</strong>: use whichever configured model gives acceptable PackBridge output fastest. The selected model is used for the next map, reprocess, Learning draft or assistant request; changing it does not rewrite jobs that were already mapped.</p>
+        {% if 'cloud' in values.ollama_model|lower %}
+          <div class="issue-banner">
+            <strong>Cloud-tagged model selected</strong>
+            <span>{{ values.ollama_model }} may send packing-list content outside the local host. Use it when the speed benefit is intentional and appropriate for the document.</span>
+          </div>
+        {% endif %}
       </div>
       {% if connection.connected %}
         <span class="status status-mapped">Connected</span>
