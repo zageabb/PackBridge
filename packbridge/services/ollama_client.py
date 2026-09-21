@@ -58,6 +58,102 @@ class OllamaClient:
             endpoint="/api/tags",
         )
 
+    def _cloud_tagged(self) -> bool:
+        return "cloud" in self.model.casefold()
+
+    @staticmethod
+    def _schema_instruction(
+        prompt: str,
+        response_model: type[BaseModel],
+    ) -> str:
+        schema = json.dumps(
+            response_model.model_json_schema(),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        return (
+            prompt.rstrip()
+            + "\n\nIMPORTANT STRUCTURED OUTPUT REQUIREMENT\n"
+            + "Return exactly one JSON object matching this JSON Schema. "
+            + "Do not add prose, markdown, comments or extra keys.\n"
+            + schema
+        )
+
+    @staticmethod
+    def _extract_json_text(content: str) -> str:
+        text = content.strip()
+        fenced_tilde = text.startswith("~~~") and text.endswith("~~~")
+        fenced_backtick = text.startswith(chr(96) * 3) and text.endswith(chr(96) * 3)
+        if fenced_tilde or fenced_backtick:
+            lines = text.splitlines()
+            if len(lines) >= 3:
+                text = "\n".join(lines[1:-1]).strip()
+
+        try:
+            json.loads(text)
+            return text
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        decoder = json.JSONDecoder()
+        starts = [
+            index
+            for index, character in enumerate(text)
+            if character in "[{"
+        ]
+        for index in starts:
+            try:
+                _, end = decoder.raw_decode(text[index:])
+                candidate = text[index:index + end]
+                json.loads(candidate)
+                return candidate
+            except (json.JSONDecodeError, TypeError, ValueError):
+                continue
+        return text
+
+    def _repair_structured_json(
+        self,
+        original_prompt: str,
+        invalid_content: str,
+        response_model: type[BaseModel],
+    ) -> OllamaResult:
+        schema = json.dumps(
+            response_model.model_json_schema(),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        repair_prompt = (
+            "Repair the candidate JSON so it matches the required schema exactly. "
+            "Do not invent document facts and do not reinterpret values. "
+            "Only repair JSON structure, field names, wrappers, missing default objects, "
+            "and remove unsupported extra keys. Return JSON only.\n\n"
+            "REQUIRED SCHEMA:\n"
+            + schema
+            + "\n\nCANDIDATE JSON/OUTPUT:\n"
+            + str(invalid_content)[:60_000]
+            + "\n\nORIGINAL TASK CONTEXT (for field meaning only):\n"
+            + original_prompt[:30_000]
+        )
+        result = self._request(
+            "/api/generate",
+            json_body={
+                "model": self.model,
+                "prompt": repair_prompt,
+                "stream": False,
+                "format": "json",
+                "options": {"temperature": 0},
+            },
+        )
+        if not result.available:
+            return result
+        return self._parse_json(
+            result,
+            result.value.get("response"),
+            response_model,
+            allow_repair=False,
+            original_prompt=original_prompt,
+        )
+
     def generate_text(self, prompt: str) -> OllamaResult:
         result = self._request(
             "/api/generate",
@@ -86,23 +182,58 @@ class OllamaClient:
         prompt: str,
         response_model: type[BaseModel] | None = None,
     ) -> OllamaResult:
+        request_prompt = prompt
         response_format: str | dict = "json"
+
         if response_model is not None:
-            response_format = response_model.model_json_schema()
+            if self._cloud_tagged():
+                # Cloud-backed Ollama models are not all equally reliable with
+                # native JSON-Schema constrained decoding. JSON mode plus the
+                # explicit schema avoids a known provider compatibility failure.
+                response_format = "json"
+                request_prompt = self._schema_instruction(prompt, response_model)
+            else:
+                response_format = response_model.model_json_schema()
 
         result = self._request(
             "/api/generate",
             json_body={
                 "model": self.model,
-                "prompt": prompt,
+                "prompt": request_prompt,
                 "stream": False,
                 "format": response_format,
                 "options": {"temperature": 0},
             },
         )
         if not result.available:
+            # Some provider/model combinations reject a JSON Schema in the
+            # format field while still supporting ordinary JSON mode.
+            if response_model is not None and not self._cloud_tagged():
+                fallback = self._request(
+                    "/api/generate",
+                    json_body={
+                        "model": self.model,
+                        "prompt": self._schema_instruction(prompt, response_model),
+                        "stream": False,
+                        "format": "json",
+                        "options": {"temperature": 0},
+                    },
+                )
+                if fallback.available:
+                    return self._parse_json(
+                        fallback,
+                        fallback.value.get("response"),
+                        response_model,
+                        original_prompt=prompt,
+                    )
             return result
-        return self._parse_json(result, result.value.get("response"), response_model)
+
+        return self._parse_json(
+            result,
+            result.value.get("response"),
+            response_model,
+            original_prompt=prompt,
+        )
 
     def chat(self, messages: list[dict[str, str]], system_prompt: str = "") -> OllamaResult:
         bounded = []
@@ -221,22 +352,69 @@ class OllamaClient:
         result: OllamaResult,
         content: Any,
         response_model: type[BaseModel] | None,
+        *,
+        allow_repair: bool = True,
+        original_prompt: str = "",
     ) -> OllamaResult:
         if not isinstance(content, str) or not content.strip():
             return self._invalid(result, "Ollama response contains no JSON content.")
-        text = content.strip()
-        fenced_tilde = text.startswith("~~~") and text.endswith("~~~")
-        fenced_backtick = text.startswith(chr(96) * 3) and text.endswith(chr(96) * 3)
-        if fenced_tilde or fenced_backtick:
-            lines = text.splitlines()
-            if len(lines) >= 3:
-                text = "\n".join(lines[1:-1]).strip()
+
+        text = self._extract_json_text(content)
         try:
             parsed = json.loads(text)
-            value = response_model.model_validate(parsed) if response_model else parsed
-        except (json.JSONDecodeError, ValidationError, TypeError, ValueError):
-            return self._invalid(result, "Ollama returned JSON that does not match the required schema.")
-        return OllamaResult(True, value=value, attempts=result.attempts, model=self.model, endpoint=result.endpoint)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            if allow_repair and response_model is not None:
+                return self._repair_structured_json(
+                    original_prompt,
+                    content,
+                    response_model,
+                )
+            return self._invalid(
+                result,
+                "Ollama returned content that could not be parsed as JSON.",
+            )
+
+        if response_model is None:
+            return OllamaResult(
+                True,
+                value=parsed,
+                attempts=result.attempts,
+                model=self.model,
+                endpoint=result.endpoint,
+            )
+
+        try:
+            value = response_model.model_validate(parsed)
+        except ValidationError as exc:
+            if allow_repair:
+                return self._repair_structured_json(
+                    original_prompt,
+                    text,
+                    response_model,
+                )
+            details = exc.errors()[:3]
+            summary = "; ".join(
+                f"{'.'.join(str(part) for part in item.get('loc', ()))}: {item.get('msg', 'invalid')}"
+                for item in details
+            )
+            return self._invalid(
+                result,
+                "Ollama returned JSON that does not match the required schema"
+                + (f" ({summary})." if summary else "."),
+            )
+        except (TypeError, ValueError) as exc:
+            return self._invalid(
+                result,
+                f"Ollama returned JSON that could not be validated: {exc}",
+            )
+
+        return OllamaResult(
+            True,
+            value=value,
+            attempts=result.attempts,
+            model=self.model,
+            endpoint=result.endpoint,
+        )
 
     @staticmethod
     def _invalid(result: OllamaResult, warning: str) -> OllamaResult:
