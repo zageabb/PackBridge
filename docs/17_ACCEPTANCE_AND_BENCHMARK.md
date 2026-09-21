@@ -16,16 +16,17 @@ A candidate model must pass the controlled golden set with:
 - no unresolved blocking validation issues caused by mapping;
 - ambiguous evidence surfaced for review rather than silently guessed.
 
-## Smaller-model selection
+## Speed-focused model selection
 
-`qwen3:14b` is the baseline. A smaller candidate such as `qwen3:8b` may replace it only when:
+`qwen3:14b` is the local baseline, but the reason to switch models is **speed**, not to seek higher accuracy. Any candidate model — local or a deliberately selected cloud-tagged Ollama model — may be preferred when:
 
-- all hard gates above pass;
-- field and item accuracy are each no more than 0.5 percentage points below the baseline, and still at least 99%;
+- it meets the minimum correctness floor above;
 - package grouping and null preservation remain 100%;
-- measured latency and resource use provide a practical benefit on the deployment host.
+- it materially reduces end-to-end mapping time for the same document set.
 
-The CLI command `packbridge benchmark-compare` applies the quality portion of this rule. Final model selection should also consider host memory/VRAM and concurrent-use behaviour.
+The candidate does not need to match the baseline's exact accuracy if both are already above the minimum acceptance floor. The CLI command `packbridge benchmark-compare` therefore reports speedup and marks a candidate preferred for speed when it clears that floor and is faster.
+
+Cloud-tagged models are a separate deployment/privacy choice: using one may send source text outside the local host, so PackBridge surfaces that fact in the interface rather than silently treating it as local.
 
 ## Golden document set
 
@@ -65,4 +66,4 @@ Each benchmark report records per-document and aggregate latency. On the real ho
 - model name/version;
 - host RAM/VRAM use observed during the test.
 
-No fixed latency threshold is imposed before the first host baseline because the requirement is deployment-hardware dependent. Quality gates are not relaxed to gain speed.
+No fixed latency threshold is imposed before the first host baseline because performance depends on the deployment path. Speed is the optimisation target, but the minimum correctness floor is retained so a faster model cannot silently produce structurally poor SSD data.
