@@ -3,11 +3,46 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class MappedValue(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalise_shorthand(cls, value):
+        # Faster/provider-backed models sometimes return the mapped scalar
+        # directly even when given the full JSON schema. Preserve strict
+        # canonical output by normalising that shorthand at the boundary.
+        if value is None:
+            return {"value": None, "status": "MISSING"}
+        if not isinstance(value, dict):
+            return {"value": value, "status": "SUPPORTED"}
+
+        known = {"value", "unit", "raw", "locator", "status"}
+        if known.intersection(value):
+            cleaned = {key: value[key] for key in known if key in value}
+            status = cleaned.get("status")
+            if isinstance(status, str):
+                cleaned["status"] = status.strip().upper()
+            if "status" not in cleaned:
+                cleaned["status"] = (
+                    "MISSING" if cleaned.get("value") in (None, "") else "SUPPORTED"
+                )
+            return cleaned
+
+        # Common compact provider forms. Do not retain unsupported metadata.
+        for alias in ("text", "content", "mapped_value", "result"):
+            if alias in value and len(value) <= 4:
+                return {
+                    "value": value.get(alias),
+                    "unit": value.get("unit"),
+                    "raw": value.get("raw"),
+                    "locator": value.get("locator"),
+                    "status": "SUPPORTED",
+                }
+        return value
 
     value: Any = None
     unit: str | None = None
