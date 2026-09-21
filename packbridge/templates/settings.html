@@ -15,7 +15,7 @@
     <div class="section-heading">
       <div>
         <h2>Ollama connection</h2>
-        <p>Baseline mapper model: <code>qwen3:14b</code>.</p>
+        <p>Baseline mapper model: <code>qwen3:14b</code>. The selected model is used for the next map, reprocess, Learning draft or assistant request; changing it does not rewrite jobs that were already mapped.</p>
       </div>
       {% if connection.connected %}
         <span class="status status-mapped">Connected</span>
