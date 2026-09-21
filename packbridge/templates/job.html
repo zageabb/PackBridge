@@ -89,6 +89,12 @@
           <span>{{ job.document_profile or "Generic mapper" }}</span>
         </div>
       </div>
+      <div class="job-model-trace">
+        <span>Active model: <strong>{{ active_ollama_model }}</strong></span>
+        {% if last_mapping_model %}
+          <span>Last mapped with: <strong>{{ last_mapping_model }}</strong></span>
+        {% endif %}
+      </div>
       <div class="job-actions">
         <span class="status status-{{ job.status|replace('_','-') }}">{{ job.status|replace('_',' ') }}</span>
         {% if profile_knowledge_path %}
