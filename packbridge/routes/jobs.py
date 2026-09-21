@@ -311,6 +311,7 @@ def view(job_id: int):
         ssd_preview=ssd_preview,
         profile_knowledge_path=profile_knowledge_path,
         learning_recommended=learning_recommended,
+        active_ollama_model=ollama_client().model,
         selected_ssd_override=(
             ssd_context.case_overrides.get(
                 str((((selected or {}).get("case_number") or {}).get("working") or {}).get("value") or "")
@@ -1494,6 +1495,7 @@ def chat(job_id: int):
                 result.get("operation")
                 for result in data_results
             ],
+            "model": client.model,
         },
     )
     db.session.commit()
