@@ -12,7 +12,7 @@ def inline_cell(ref, text):
     return f'<c r="{ref}" t="inlineStr"><is><t>{text}</t></is></c>'
 
 
-def make_template(path, *, wrong_header=False, with_vba=True):
+def make_template(path, *, wrong_header=False, with_vba=True, end_row=90):
     headers = {
         "C21": "Qty",
         "D21": "Wrong" if wrong_header else "Content Description / Equipment (Name)",
@@ -32,9 +32,15 @@ def make_template(path, *, wrong_header=False, with_vba=True):
     cells = "".join(inline_cell(ref, value) for ref, value in headers.items())
     validations = "".join(
         f'<dataValidation type="list" sqref="{ref}"><formula1>"x"</formula1></dataValidation>'
-        for ref in ("G23:G90", "R23:R90", "T23:T90", "U23:U90", "V23:V90")
+        for ref in (
+            f"G23:G{end_row}",
+            f"R23:R{end_row}",
+            f"T23:T{end_row}",
+            f"U23:U{end_row}",
+            f"V23:V{end_row}",
+        )
     )
-    validations += '<dataValidation type="decimal" operator="greaterThanOrEqual" sqref="O23:O90"><formula1>N23</formula1></dataValidation>'
+    validations += f'<dataValidation type="decimal" operator="greaterThanOrEqual" sqref="O23:O{end_row}"><formula1>N23</formula1></dataValidation>'
 
     workbook = f'''<?xml version="1.0" encoding="UTF-8"?>
     <workbook xmlns="{MAIN}" xmlns:r="{REL}">
@@ -57,7 +63,7 @@ def make_template(path, *, wrong_header=False, with_vba=True):
     </worksheet>'''
     empty_sheet = f'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="{MAIN}"><sheetData/></worksheet>'
     table = f'''<?xml version="1.0" encoding="UTF-8"?>
-    <table xmlns="{MAIN}" id="2" name="Table2" displayName="Table2" ref="C22:W90" totalsRowShown="0">
+    <table xmlns="{MAIN}" id="2" name="Table2" displayName="Table2" ref="C22:W{end_row}" totalsRowShown="0">
       <tableColumns count="1"><tableColumn id="1" name="(Always 1)"/></tableColumns>
     </table>'''
 
@@ -104,3 +110,41 @@ def test_macro_free_shape_warns_but_can_be_structurally_compatible(tmp_path):
     assert result.compatible is True
     assert result.has_vba is False
     assert any("no VBA" in warning for warning in result.warnings)
+
+
+
+def test_shorter_template_capacity_is_accepted_when_validations_match(tmp_path):
+    path = tmp_path / "short-template.xlsm"
+    make_template(path, end_row=38)
+
+    result = inspect_template(path)
+
+    assert result.compatible is True
+    assert result.data_start_row == 23
+    assert result.data_end_row == 38
+    assert result.row_capacity == 16
+    assert result.errors == []
+
+
+def test_shorter_template_is_rejected_when_validation_does_not_cover_table(tmp_path):
+    path = tmp_path / "bad-short-template.xlsm"
+    make_template(path, end_row=38)
+
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    with zipfile.ZipFile(path, "a") as archive:
+        root = ET.fromstring(archive.read("xl/worksheets/sheet1.xml"))
+        ns = {"m": MAIN}
+        validations = root.find("m:dataValidations", ns)
+        first = validations.find("m:dataValidation", ns)
+        first.attrib["sqref"] = "G23:G30"
+        archive.writestr(
+            "xl/worksheets/sheet1.xml",
+            ET.tostring(root, encoding="utf-8", xml_declaration=True),
+        )
+
+    result = inspect_template(path)
+
+    assert result.compatible is False
+    assert any("G23:G38" in error for error in result.errors)
