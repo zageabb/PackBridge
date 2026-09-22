@@ -19,7 +19,7 @@ REQUIRED_SHEETS = {
     "PLs_Temp": "veryHidden",
     "MLs_Temp": "veryHidden",
 }
-EXPECTED_TABLE = {"name": "Table2", "ref": "C22:W90"}
+EXPECTED_TABLE = {"name": "Table2", "start": "C22", "end_column": "W"}
 EXPECTED_SOCS_HEADERS = {
     "C21": "Qty",
     "D21": "Content Description / Equipment (Name)",
@@ -36,14 +36,7 @@ EXPECTED_SOCS_HEADERS = {
     "T21": "Packaging Material",
     "U21": "Stackability",
 }
-EXPECTED_VALIDATION_RANGES = {
-    "G23:G90",
-    "O23:O90",
-    "R23:R90",
-    "T23:T90",
-    "U23:U90",
-    "V23:V90",
-}
+EXPECTED_VALIDATION_COLUMNS = {"G", "O", "R", "T", "U", "V"}
 
 
 @dataclass(frozen=True)
@@ -72,6 +65,9 @@ class TemplateInspection:
     generated_pl_count: int = 0
     generated_ml_count: int = 0
     existing_case_count: int = 0
+    data_start_row: int | None = None
+    data_end_row: int | None = None
+    row_capacity: int = 0
     generation_ready: bool = False
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -220,6 +216,48 @@ def _validations(
     return result
 
 
+def _parse_a1_ref(ref: str) -> tuple[str, int, str, int] | None:
+    value = str(ref or "").replace("$", "").strip().upper()
+    match = re.fullmatch(r"([A-Z]+)(\d+):([A-Z]+)(\d+)", value)
+    if not match:
+        return None
+    return (
+        match.group(1),
+        int(match.group(2)),
+        match.group(3),
+        int(match.group(4)),
+    )
+
+
+def _range_covers_column_rows(ref: str, column: str, start_row: int, end_row: int) -> list[tuple[int, int]]:
+    parsed = _parse_a1_ref(ref)
+    if parsed is None:
+        return []
+    start_col, start, end_col, end = parsed
+    if start_col != end_col or start_col != column:
+        return []
+    low, high = sorted((start, end))
+    low = max(low, start_row)
+    high = min(high, end_row)
+    return [(low, high)] if low <= high else []
+
+
+def _intervals_cover(intervals: list[tuple[int, int]], start_row: int, end_row: int) -> bool:
+    if not intervals:
+        return False
+    merged = sorted(intervals)
+    cursor = start_row
+    for low, high in merged:
+        if high < cursor:
+            continue
+        if low > cursor:
+            return False
+        cursor = max(cursor, high + 1)
+        if cursor > end_row:
+            return True
+    return cursor > end_row
+
+
 def _structure_fingerprint(payload: dict[str, Any]) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
     return hashlib.sha256(encoded).hexdigest()
@@ -279,10 +317,27 @@ def inspect_template(path: str | Path) -> TemplateInspection:
             )
             if table is None:
                 inspection.errors.append("Required SoCs table Table2 was not found.")
-            elif table.ref != EXPECTED_TABLE["ref"]:
-                inspection.errors.append(
-                    f"Table2 uses {table.ref}; expected {EXPECTED_TABLE['ref']}."
-                )
+            else:
+                parsed_table = _parse_a1_ref(table.ref)
+                if parsed_table is None:
+                    inspection.errors.append(
+                        f"Table2 range {table.ref!r} is not a supported A1 range."
+                    )
+                else:
+                    start_col, start_row, end_col, end_row = parsed_table
+                    if (
+                        f"{start_col}{start_row}" != EXPECTED_TABLE["start"]
+                        or end_col != EXPECTED_TABLE["end_column"]
+                        or end_row < 23
+                    ):
+                        inspection.errors.append(
+                            "Table2 must start at C22, end in column W, and contain at least one data row; "
+                            f"found {table.ref}."
+                        )
+                    else:
+                        inspection.data_start_row = start_row + 1
+                        inspection.data_end_row = end_row
+                        inspection.row_capacity = end_row - start_row
 
             socs_path = sheet_paths.get("SoCs_Temp")
             if socs_path and socs_path in names:
@@ -298,7 +353,9 @@ def inspect_template(path: str | Path) -> TemplateInspection:
                         inspection.errors.append(
                             f"SoCs_Temp {ref} is {actual!r}; expected {expected!r}."
                         )
-                case_refs = {f"S{row}" for row in range(23, 91)}
+                case_start = inspection.data_start_row or 23
+                case_end = inspection.data_end_row or 90
+                case_refs = {f"S{row}" for row in range(case_start, case_end + 1)}
                 case_values = _sheet_cells(archive, socs_path, shared, case_refs)
                 inspection.existing_case_count = sum(
                     value not in (None, "") for value in case_values.values()
@@ -310,16 +367,36 @@ def inspect_template(path: str | Path) -> TemplateInspection:
                     )
 
                 inspection.validations = _validations(archive, socs_path)
-                present_ranges = {
-                    part
-                    for validation in inspection.validations
-                    for part in str(validation.get("sqref") or "").split()
-                }
-                missing_validations = sorted(EXPECTED_VALIDATION_RANGES - present_ranges)
-                if missing_validations:
+                validation_start = inspection.data_start_row or 23
+                validation_end = inspection.data_end_row or 90
+                missing_validation_columns = []
+                for column in sorted(EXPECTED_VALIDATION_COLUMNS):
+                    intervals: list[tuple[int, int]] = []
+                    for validation in inspection.validations:
+                        for part in str(validation.get("sqref") or "").split():
+                            intervals.extend(
+                                _range_covers_column_rows(
+                                    part,
+                                    column,
+                                    validation_start,
+                                    validation_end,
+                                )
+                            )
+                    if not _intervals_cover(
+                        intervals,
+                        validation_start,
+                        validation_end,
+                    ):
+                        missing_validation_columns.append(column)
+
+                if missing_validation_columns:
+                    expected = ", ".join(
+                        f"{column}{validation_start}:{column}{validation_end}"
+                        for column in missing_validation_columns
+                    )
                     inspection.errors.append(
-                        "Required SoCs validation ranges are missing: "
-                        + ", ".join(missing_validations)
+                        "Required SoCs validation coverage is missing for: "
+                        + expected
                     )
             elif "SoCs_Temp" in sheet_paths:
                 inspection.errors.append("SoCs_Temp worksheet XML is missing.")
