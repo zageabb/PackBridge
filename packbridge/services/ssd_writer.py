@@ -230,8 +230,13 @@ def write_socs_preview(
         raise SSDWriterError(
             "SSD preview contains blocking issues: " + "; ".join(preview.blocking[:8])
         )
-    if len(preview.rows) > 68:
-        raise SSDWriterError("SSD preview exceeds the verified 68-row template capacity.")
+    capacity = inspection.row_capacity
+    if capacity <= 0 or inspection.data_start_row is None or inspection.data_end_row is None:
+        raise SSDWriterError("SSD template does not expose a usable SoCs table capacity.")
+    if len(preview.rows) > capacity:
+        raise SSDWriterError(
+            f"SSD preview contains {len(preview.rows)} package rows but this template supports {capacity}."
+        )
 
     with zipfile.ZipFile(template, "r") as archive:
         sheet_paths, _ = _workbook_maps(archive)
@@ -254,8 +259,11 @@ def write_socs_preview(
                 raise SSDWriterError(
                     f"Case {row.case_number or row.package_index} has no valid SSD row."
                 )
-            if not 23 <= row.excel_row <= 90:
-                raise SSDWriterError(f"SSD row {row.excel_row} is outside C23:X90.")
+            if not inspection.data_start_row <= row.excel_row <= inspection.data_end_row:
+                raise SSDWriterError(
+                    f"SSD row {row.excel_row} is outside this template's data range "
+                    f"C{inspection.data_start_row}:X{inspection.data_end_row}."
+                )
 
             for column in APPROVED_ROW_COLUMNS:
                 ref = f"{column}{row.excel_row}"
