@@ -35,6 +35,19 @@ def _context(project: SSDProject) -> SSDContext:
         return SSDContext()
 
 
+def _apply_template_capacity(preview, template) -> None:
+    capacity = int(
+        (((template or {}).get("inspection") or {}).get("row_capacity") or 0)
+    )
+    if capacity and len(preview.rows) > capacity:
+        message = (
+            f"Active SSD template supports {capacity} package rows; "
+            f"this project contains {len(preview.rows)}."
+        )
+        if message not in preview.blocking:
+            preview.blocking.append(message)
+
+
 def _mapped_inputs(project: SSDProject) -> list[AggregationInput]:
     inputs = []
     for link in project.job_links:
@@ -89,14 +102,7 @@ def view(project_id: int):
     inputs = _mapped_inputs(project)
     preview = build_project_preview(inputs, context)
     template = active_template(current_app.config["TEMPLATE_ROOT"])
-    template_capacity = int(
-        (((template or {}).get("inspection") or {}).get("row_capacity") or 0)
-    )
-    if template_capacity and len(preview.rows) > template_capacity:
-        preview.blocking.append(
-            f"Active SSD template supports {template_capacity} package rows; "
-            f"this project contains {len(preview.rows)}."
-        )
+    _apply_template_capacity(preview, template)
     inspection = (template or {}).get("inspection") or {}
     base_generation_ready = bool(
         preview.rows
@@ -261,6 +267,7 @@ def build_validation_workbook(project_id: int):
     context = _context(project)
     preview = build_project_preview(_mapped_inputs(project), context)
     template = active_template(current_app.config["TEMPLATE_ROOT"])
+    _apply_template_capacity(preview, template)
 
     if not preview.rows:
         flash("Attach at least one mapped packing-list job before building a workbook.", "danger")
@@ -346,6 +353,7 @@ def build_production_workbook(project_id: int):
     context = _context(project)
     preview = build_project_preview(_mapped_inputs(project), context)
     template = active_template(current_app.config["TEMPLATE_ROOT"])
+    _apply_template_capacity(preview, template)
 
     if not preview.rows:
         flash("Attach at least one mapped packing-list job before generating an SSD.", "danger")
