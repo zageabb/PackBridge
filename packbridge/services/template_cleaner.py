@@ -85,7 +85,12 @@ def _clear_cell_value(cell: ET.Element) -> None:
     cell.attrib.pop("t", None)
 
 
-def _clean_socs_xml(payload: bytes) -> bytes:
+def _clean_socs_xml(
+    payload: bytes,
+    *,
+    data_start_row: int,
+    data_end_row: int,
+) -> bytes:
     root = _parse_xml(payload)
     for cell in root.findall(".//" + _q("c")):
         ref = cell.attrib.get("r", "")
@@ -98,7 +103,7 @@ def _clean_socs_xml(payload: bytes) -> bytes:
         if row is None or column is None:
             continue
         column_number = _column_number(column)
-        if 23 <= row <= 90 and 3 <= column_number <= 24:  # C:X
+        if data_start_row <= row <= data_end_row and 3 <= column_number <= 24:  # C:X
             _clear_cell_value(cell)
 
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
@@ -252,7 +257,11 @@ def create_clean_generation_template(
             rels_root, encoding="utf-8", xml_declaration=True
         )
         socs_path = retained_paths["SoCs_Temp"]
-        cleaned_socs = _clean_socs_xml(archive.read(socs_path))
+        cleaned_socs = _clean_socs_xml(
+            archive.read(socs_path),
+            data_start_row=before.data_start_row or 23,
+            data_end_row=before.data_end_row or 90,
+        )
 
         # Remove sheet-specific rel files for generated sheets as well.
         removed_sheet_rel_parts = {
