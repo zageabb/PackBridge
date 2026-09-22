@@ -89,6 +89,14 @@ def view(project_id: int):
     inputs = _mapped_inputs(project)
     preview = build_project_preview(inputs, context)
     template = active_template(current_app.config["TEMPLATE_ROOT"])
+    template_capacity = int(
+        (((template or {}).get("inspection") or {}).get("row_capacity") or 0)
+    )
+    if template_capacity and len(preview.rows) > template_capacity:
+        preview.blocking.append(
+            f"Active SSD template supports {template_capacity} package rows; "
+            f"this project contains {len(preview.rows)}."
+        )
     inspection = (template or {}).get("inspection") or {}
     base_generation_ready = bool(
         preview.rows
