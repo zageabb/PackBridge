@@ -67,9 +67,11 @@ PackBridge must therefore generate from approved source/working data and must co
 The principal Excel table is:
 
 - table name: **Table2**
-- table range: **C22:W90**
-- data rows: **23:90**
-- capacity in this reference: **68 package rows**
+- table range in the verified reference workbook: **C22:W90**
+- data rows in that reference: **23:90**
+- capacity in that reference: **68 package rows**
+
+PackBridge no longer assumes every valid SSD workbook must have exactly 68 rows. The controlled-template inspector derives the package capacity from the actual Table2 end row, provided the table still starts at C22, ends in column W, and the required validation controls cover the corresponding data rows. For example, Table2 `C22:W38` is treated as a 16-package template rather than rejected solely because it is shorter.
 
 Column X is visually part of the worksheet's case-data area but sits outside Table2.
 
@@ -108,7 +110,7 @@ The reference workbook contains controlled list/numeric validation for:
 - U23:U90 — Stackability;
 - V23:V90 — Dangerous Goods.
 
-The template inspector in PackBridge now verifies that these structural controls exist.
+The template inspector in PackBridge verifies that these structural controls cover the active Table2 data rows. The reference ranges above are evidence from the reference workbook, not a hard-coded requirement that every template must end at row 90.
 
 ### Lookup lists observed
 
