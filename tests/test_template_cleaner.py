@@ -244,3 +244,70 @@ def test_guarded_writer_populates_clean_template_and_preserves_vba(tmp_path):
         assert cells["N23"].find("m:v", ns).text == "50"
         assert cells["O23"].find("m:v", ns).text == "60"
         assert cells["M23"].find("m:f", ns).text == "J23*K23*L23/1000000"
+
+
+
+def test_writer_uses_inspected_template_capacity(tmp_path):
+    from packbridge.services.ssd_writer import SSDWriterError
+    import pytest
+
+    populated = tmp_path / "populated.xlsm"
+    make_populated_template(populated)
+
+    # Rewrite the table/validation range to a one-row capacity (row 23 only).
+    with zipfile.ZipFile(populated, "a") as archive:
+        table_root = ET.fromstring(archive.read("xl/tables/table1.xml"))
+        table_root.attrib["ref"] = "C22:W23"
+        archive.writestr(
+            "xl/tables/table1.xml",
+            ET.tostring(table_root, encoding="utf-8", xml_declaration=True),
+        )
+
+        sheet_root = ET.fromstring(archive.read("xl/worksheets/sheet1.xml"))
+        ns = {"m": MAIN}
+        validations = sheet_root.find("m:dataValidations", ns)
+        for validation in validations.findall("m:dataValidation", ns):
+            sqref = validation.attrib.get("sqref", "")
+            if ":" in sqref:
+                col = sqref.split(":", 1)[0][0]
+                validation.attrib["sqref"] = f"{col}23:{col}23"
+        archive.writestr(
+            "xl/worksheets/sheet1.xml",
+            ET.tostring(sheet_root, encoding="utf-8", xml_declaration=True),
+        )
+
+    # Remove the populated case so it is generation-ready.
+    clean = tmp_path / "clean.xlsm"
+    create_clean_generation_template(populated, clean)
+    inspected = inspect_template(clean)
+    assert inspected.row_capacity == 1
+
+    def field(value, unit=None):
+        return FieldValue(
+            source=SourceValue(value=value, unit=unit),
+            working=WorkingValue(value=value, unit=unit, origin="source"),
+        )
+
+    packing = PackingList(
+        packages=[
+            Package(case_number=field("C1"), net_weight=field(1, "KG"), gross_weight=field(2, "KG")),
+            Package(case_number=field("C2"), net_weight=field(1, "KG"), gross_weight=field(2, "KG")),
+        ]
+    )
+    context = SSDContext(
+        defaults=SSDCaseContext(
+            content_description="QBANK",
+            equipment_group="011",
+            declare_as="System",
+            purchase_order="4500000001",
+            purchase_order_position="10",
+            storage_requirement="Outdoor",
+            packaging_material="PALLET",
+            stackability="Stackable 1 tier",
+            dangerous_goods="N",
+        )
+    )
+    preview = build_ssd_preview(packing, context)
+
+    with pytest.raises(SSDWriterError, match="supports 1"):
+        write_socs_preview(clean, tmp_path / "out.xlsm", preview)
