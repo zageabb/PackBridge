@@ -128,6 +128,8 @@
           <div><dt>Worksheets</dt><dd>{{ inspection.sheet_count }}</dd></div>
           <div><dt>Generated PL / ML</dt><dd>{{ inspection.generated_pl_count }} / {{ inspection.generated_ml_count }}</dd></div>
           <div><dt>Existing SoCs cases</dt><dd>{{ inspection.existing_case_count }}</dd></div>
+          <div><dt>SoCs data rows</dt><dd>{% if inspection.data_start_row and inspection.data_end_row %}{{ inspection.data_start_row }}:{{ inspection.data_end_row }}{% else %}Unknown{% endif %}</dd></div>
+          <div><dt>Package capacity</dt><dd>{{ inspection.row_capacity or "Unknown" }}</dd></div>
           <div><dt>Generation ready</dt><dd>{{ "Yes" if inspection.generation_ready else "No" }}</dd></div>
           <div><dt>Structure fingerprint</dt><dd><code>{{ inspection.structural_fingerprint[:16] }}…</code></dd></div>
           <div><dt>File SHA-256</dt><dd><code>{{ inspection.sha256[:16] }}…</code></dd></div>
