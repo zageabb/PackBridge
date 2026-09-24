@@ -362,6 +362,57 @@
 
         <details class="ssd-context-panel" {% if not ssd_preview or ssd_preview.warnings %}open{% endif %}>
           <summary>SSD defaults for ALL cases</summary>
+          {% if ssd_project %}
+          <div class="ssd-context-form">
+            <div class="validation-notice">
+              <strong>Inherited from SSD Project: {{ ssd_project.name }}</strong>
+              <span>Project/header and default package values stay linked to the SSD Project. Changes made on the project flow through to this mapped job automatically.</span>
+            </div>
+            <fieldset>
+              <legend>Inherited project / header</legend>
+              <label><span>Project Name</span><input value="{{ ssd_context.header.project_name or '' }}" disabled></label>
+              <label><span>Delivery Location</span><input value="{{ ssd_context.header.delivery_location or '' }}" disabled></label>
+              <label><span>Supplier Name</span><input value="{{ ssd_context.header.supplier_name or '' }}" disabled></label>
+              <label><span>Currency</span><input value="{{ ssd_context.header.currency or '' }}" disabled></label>
+              <label><span>BU Details</span><input value="{{ ssd_context.header.bu_details or '' }}" disabled></label>
+              <label><span>Preliminary / Final</span><input value="{{ ssd_context.header.preliminary_final or '' }}" disabled></label>
+              <label><span>Pick-up Address</span><input value="{{ ssd_context.header.pickup_address or '' }}" disabled></label>
+              <label><span>Supplier Contact</span><input value="{{ ssd_context.header.supplier_contact or '' }}" disabled></label>
+              <label><span>Supplier Phone / Email</span><input value="{{ ssd_context.header.supplier_phone_email or '' }}" disabled></label>
+              <label><span>Contact Person &amp; Number</span><input value="{{ ssd_context.header.contact_person_number or '' }}" disabled></label>
+              <label><span>Supplier Reference</span><input value="{{ ssd_context.header.supplier_reference or '' }}" disabled></label>
+              <label class="wide"><span>Other Remarks</span><input value="{{ ssd_context.header.other_remarks or '' }}" disabled></label>
+            </fieldset>
+            <fieldset>
+              <legend>Inherited defaults — all cases</legend>
+              <label><span>Content Description</span><input value="{{ ssd_context.defaults.content_description or '' }}" disabled></label>
+              <label><span>EQ Group</span><input value="{{ ssd_context.defaults.equipment_group or '' }}" disabled></label>
+              <label><span>HE PO Number</span><input value="{{ ssd_context.defaults.purchase_order or '' }}" disabled></label>
+              <label><span>PO Position</span><input value="{{ ssd_context.defaults.purchase_order_position or '' }}" disabled></label>
+              <label><span>Declare As</span><input value="{{ ssd_context.defaults.declare_as or '' }}" disabled></label>
+              <label><span>Storage Requirement</span><input value="{{ ssd_context.defaults.storage_requirement or '' }}" disabled></label>
+              <label><span>Packaging Material</span><input value="{{ ssd_context.defaults.packaging_material or '' }}" disabled></label>
+              <label><span>Stackability</span><input value="{{ ssd_context.defaults.stackability or '' }}" disabled></label>
+              <label><span>Dangerous Goods</span><input value="{{ ssd_context.defaults.dangerous_goods or '' }}" disabled></label>
+              <label><span>Border Crossing Value</span><input value="{{ ssd_context.defaults.border_crossing_value if ssd_context.defaults.border_crossing_value is not none else '' }}" disabled></label>
+              <label><span>Pickup Week Planned</span><input value="{{ ssd_context.defaults.pickup_week_planned or '' }}" disabled></label>
+              <label><span>Pickup Week Actual</span><input value="{{ ssd_context.defaults.pickup_week_actual or '' }}" disabled></label>
+              <label><span>Item Designation</span><input value="{{ ssd_context.defaults.item_designation or '' }}" disabled></label>
+              <label class="wide"><span>Remarks</span><input value="{{ ssd_context.defaults.remarks or '' }}" disabled></label>
+            </fieldset>
+            <div class="ssd-context-actions">
+              <span>Case-specific exceptions can still be entered below.</span>
+              <div class="button-row">
+                <a class="btn btn-primary" href="{{ url_for('projects.view', project_id=ssd_project.id) }}#project-preview">Edit SSD Project values</a>
+                {% if ssd_local_has_header_defaults %}
+                <form method="post" action="{{ url_for('jobs.inherit_ssd_project_context', job_id=job.id) }}" onsubmit="return window.confirm('Clear this job\'s saved header/default overrides and inherit those values from the SSD Project? Case-specific overrides will be kept.');">
+                  <button class="btn btn-secondary" type="submit">Use SSD Project values</button>
+                </form>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% else %}
           <form method="post" action="{{ url_for('jobs.update_ssd_context', job_id=job.id) }}" class="ssd-context-form">
             <fieldset>
               <legend>Project / header</legend>
@@ -441,6 +492,7 @@
               <button class="btn btn-primary" type="submit">Save defaults for all cases</button>
             </div>
           </form>
+          {% endif %}
         </details>
 
         {% if selected_package and selected_package.case_number.working and selected_package.case_number.working.value %}

@@ -145,7 +145,7 @@ def _selected_package(packages: list[dict], selected_case: str | None):
     return packages[0], 0
 
 
-def _ssd_context(job: Job) -> SSDContext:
+def _local_ssd_context(job: Job) -> SSDContext:
     record = SSDContextRecord.query.filter_by(job_id=job.id).first()
     if not record or not record.context_json:
         return SSDContext()
@@ -153,6 +153,55 @@ def _ssd_context(job: Job) -> SSDContext:
         return SSDContext.model_validate_json(record.context_json)
     except ValueError:
         return SSDContext()
+
+
+def _project_ssd_context(job: Job) -> tuple[SSDContext, object | None]:
+    link = getattr(job, "ssd_project_link", None)
+    project = getattr(link, "project", None) if link is not None else None
+    if project is None or not project.context_json:
+        return SSDContext(), project
+    try:
+        return SSDContext.model_validate_json(project.context_json), project
+    except ValueError:
+        return SSDContext(), project
+
+
+def _merge_context_model(base, override):
+    values = base.model_dump()
+    for name, value in override.model_dump().items():
+        if value not in (None, ""):
+            values[name] = value
+    return type(base).model_validate(values)
+
+
+def _ssd_context(job: Job) -> SSDContext:
+    """Return the effective job SSD context.
+
+    An attached SSD Project supplies the inherited header/default context. Values
+    explicitly stored against the job override that inherited base. Project and
+    job case overrides are then merged, with job-specific case values winning.
+    """
+    local = _local_ssd_context(job)
+    project_context, _ = _project_ssd_context(job)
+
+    header = _merge_context_model(project_context.header, local.header)
+    defaults = _merge_context_model(project_context.defaults, local.defaults)
+
+    case_overrides = dict(project_context.case_overrides)
+    for case_number, local_override in local.case_overrides.items():
+        if case_number in case_overrides:
+            case_overrides[case_number] = _merge_context_model(
+                case_overrides[case_number],
+                local_override,
+            )
+        else:
+            case_overrides[case_number] = local_override
+
+    return SSDContext(
+        header=header,
+        defaults=defaults,
+        case_overrides=case_overrides,
+    )
 
 
 def _form_text(name: str) -> str | None:
@@ -298,6 +347,15 @@ def view(job_id: int):
     counts = {"INFO": 0, "WARNING": 0, "BLOCKING": 0}
     resolved_warning_count = 0
     ssd_context = _ssd_context(job)
+    ssd_local_context = _local_ssd_context(job)
+    ssd_project_context, ssd_project = _project_ssd_context(job)
+    ssd_local_has_header_defaults = any(
+        value not in (None, "")
+        for value in (
+            list(ssd_local_context.header.model_dump().values())
+            + list(ssd_local_context.defaults.model_dump().values())
+        )
+    )
     ssd_preview = None
 
     if job.working_json:
@@ -367,6 +425,10 @@ def view(job_id: int):
         resolved_warning_count=resolved_warning_count,
         audit_events=audit_events,
         ssd_context=ssd_context,
+        ssd_local_context=ssd_local_context,
+        ssd_project_context=ssd_project_context,
+        ssd_project=ssd_project,
+        ssd_local_has_header_defaults=ssd_local_has_header_defaults,
         ssd_preview=ssd_preview,
         profile_knowledge_path=profile_knowledge_path,
         learning_recommended=learning_recommended,
@@ -375,7 +437,7 @@ def view(job_id: int):
         last_mapping_model=last_mapping_model,
         can_delete_failed=can_delete_failed_job(job),
         selected_ssd_override=(
-            ssd_context.case_overrides.get(
+            ssd_local_context.case_overrides.get(
                 str((((selected or {}).get("case_number") or {}).get("working") or {}).get("value") or "")
             )
             if selected
@@ -1182,7 +1244,7 @@ def propose_field_learning(job_id: int):
 @bp.post("/<int:job_id>/ssd-context")
 def update_ssd_context(job_id: int):
     job = Job.query.get_or_404(job_id)
-    context = _ssd_context(job)
+    context = _local_ssd_context(job)
 
     header_fields = (
         "currency",
@@ -1264,6 +1326,38 @@ def update_ssd_context(job_id: int):
     return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
 
 
+@bp.post("/<int:job_id>/ssd-context/inherit-project")
+def inherit_ssd_project_context(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    project_context, project = _project_ssd_context(job)
+    if project is None:
+        flash("This job is not attached to an SSD Project.", "warning")
+        return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
+
+    local = _local_ssd_context(job)
+    local.header = type(local.header)()
+    local.defaults = type(local.defaults)()
+
+    record = SSDContextRecord.query.filter_by(job_id=job.id).first()
+    if record is None:
+        record = SSDContextRecord(job_id=job.id)
+        db.session.add(record)
+    record.context_json = local.model_dump_json()
+    record.updated_by = "user"
+
+    _audit(
+        job.id,
+        "ssd_project_context_inherited",
+        f"Inherited SSD header/default context from project {project.name}",
+        {"project_id": project.id, "project_name": project.name},
+        actor="user",
+    )
+    db.session.commit()
+
+    flash(f"Now inheriting SSD project/default values from {project.name}.", "success")
+    return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
+
+
 @bp.post("/<int:job_id>/ssd-context/case")
 def update_ssd_case_context(job_id: int):
     job = Job.query.get_or_404(job_id)
@@ -1286,7 +1380,7 @@ def update_ssd_case_context(job_id: int):
         flash("The selected case is not present in the current working dataset.", "danger")
         return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
 
-    context = _ssd_context(job)
+    context = _local_ssd_context(job)
     values = (
         context.case_overrides.get(case_number).model_dump()
         if case_number in context.case_overrides
@@ -1456,7 +1550,7 @@ def reset_ssd_case_context(job_id: int):
         flash("Case number is required.", "danger")
         return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
 
-    context = _ssd_context(job)
+    context = _local_ssd_context(job)
     existed = context.case_overrides.pop(case_number, None) is not None
     record = SSDContextRecord.query.filter_by(job_id=job.id).first()
     if record is None:
