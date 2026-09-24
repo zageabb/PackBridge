@@ -361,7 +361,7 @@
         </div>
 
         <details class="ssd-context-panel" {% if not ssd_preview or ssd_preview.warnings %}open{% endif %}>
-          <summary>SSD project/default values</summary>
+          <summary>SSD defaults for ALL cases</summary>
           <form method="post" action="{{ url_for('jobs.update_ssd_context', job_id=job.id) }}" class="ssd-context-form">
             <fieldset>
               <legend>Project / header</legend>
@@ -385,7 +385,7 @@
             </fieldset>
 
             <fieldset>
-              <legend>Default package values</legend>
+              <legend>Default package values — applied to every case unless overridden</legend>
               <label><span>Content Description</span><input name="default_content_description" value="{{ ssd_context.defaults.content_description or '' }}" placeholder="e.g. QBANK"></label>
               <label><span>EQ Group</span><input name="default_equipment_group" value="{{ ssd_context.defaults.equipment_group or '' }}" placeholder="e.g. 011"></label>
               <label><span>HE PO Number</span><input name="default_purchase_order" value="{{ ssd_context.defaults.purchase_order or '' }}"></label>
@@ -437,8 +437,8 @@
             </fieldset>
 
             <div class="ssd-context-actions">
-              <span>These values are SSD/project context, not invented packing-list source data.</span>
-              <button class="btn btn-primary" type="submit">Save SSD context</button>
+              <span>These defaults apply to every case in this job unless a case-specific override is set below.</span>
+              <button class="btn btn-primary" type="submit">Save defaults for all cases</button>
             </div>
           </form>
         </details>
@@ -504,9 +504,16 @@
               <label class="wide"><span>Remarks</span><input name="case_remarks" value="{{ selected_ssd_override.remarks if selected_ssd_override and selected_ssd_override.remarks else '' }}" placeholder="{{ ssd_context.defaults.remarks or 'Inherited default' }}"></label>
             </fieldset>
             <div class="ssd-context-actions">
-              <span>Blank fields inherit the job defaults. Overrides are stored separately from source evidence.</span>
+              <span>Blank fields inherit the defaults above. Use Apply to all cases when an entered value should become the default everywhere.</span>
               <div class="button-row">
-                <button class="btn btn-primary" type="submit">Save case override</button>
+                <button class="btn btn-primary" type="submit">Save this case only</button>
+                <button
+                  class="btn btn-secondary"
+                  type="submit"
+                  formaction="{{ url_for('jobs.apply_ssd_case_context_to_all', job_id=job.id) }}"
+                  formmethod="post"
+                  onclick="return window.confirm('Apply the non-blank values entered here to ALL cases? Existing overrides for those same fields will be cleared.');"
+                >Apply entered values to all cases</button>
               </div>
             </div>
           </form>
