@@ -1356,6 +1356,98 @@ def update_ssd_case_context(job_id: int):
     return redirect(url_for("jobs.view", job_id=job.id, case=case_number) + "#output-preview")
 
 
+@bp.post("/<int:job_id>/ssd-context/case/apply-all")
+def apply_ssd_case_context_to_all(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    if not job.working_json:
+        flash("Map the packing list before applying SSD values to all cases.", "warning")
+        return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
+
+    case_number = _form_text("case_number")
+    context = _ssd_context(job)
+
+    fields = (
+        "content_description",
+        "equipment_group",
+        "declare_as",
+        "purchase_order",
+        "purchase_order_position",
+        "pickup_week_planned",
+        "pickup_week_actual",
+        "storage_requirement",
+        "packaging_material",
+        "stackability",
+        "dangerous_goods",
+        "item_designation",
+        "remarks",
+    )
+
+    submitted: dict[str, object] = {}
+    for name in fields:
+        value = _form_text("case_" + name)
+        if value is not None:
+            submitted[name] = value
+
+    border_value = _form_text("case_border_crossing_value")
+    if border_value is not None:
+        try:
+            submitted["border_crossing_value"] = float(border_value.replace(",", ""))
+        except ValueError:
+            flash("Case Border Crossing Value must be numeric.", "danger")
+            return redirect(
+                url_for("jobs.view", job_id=job.id, case=case_number) + "#output-preview"
+            )
+
+    if not submitted:
+        flash("Enter at least one case value before applying it to all cases.", "warning")
+        return redirect(
+            url_for("jobs.view", job_id=job.id, case=case_number) + "#output-preview"
+        )
+
+    defaults = context.defaults.model_dump()
+    defaults.update(submitted)
+    context.defaults = SSDCaseContext.model_validate(defaults)
+
+    # Remove these same fields from every case override so the newly promoted defaults
+    # genuinely apply across all cases. Unrelated per-case overrides are preserved.
+    updated_overrides: dict[str, SSDCaseContext] = {}
+    for key, override in context.case_overrides.items():
+        values = override.model_dump()
+        for name in submitted:
+            values[name] = None
+        cleaned = SSDCaseContext.model_validate(values)
+        if any(value not in (None, "") for value in cleaned.model_dump().values()):
+            updated_overrides[key] = cleaned
+    context.case_overrides = updated_overrides
+
+    record = SSDContextRecord.query.filter_by(job_id=job.id).first()
+    if record is None:
+        record = SSDContextRecord(job_id=job.id)
+        db.session.add(record)
+    record.context_json = context.model_dump_json()
+    record.updated_by = "user"
+
+    _audit(
+        job.id,
+        "ssd_defaults_applied_all_cases",
+        "Applied SSD case values as defaults for all cases",
+        {
+            "source_case": case_number,
+            "fields": sorted(submitted),
+        },
+        actor="user",
+    )
+    db.session.commit()
+
+    flash(
+        f"Applied {len(submitted)} SSD value(s) to all cases as defaults.",
+        "success",
+    )
+    return redirect(
+        url_for("jobs.view", job_id=job.id, case=case_number) + "#output-preview"
+    )
+
+
 @bp.post("/<int:job_id>/ssd-context/case/reset")
 def reset_ssd_case_context(job_id: int):
     job = Job.query.get_or_404(job_id)
