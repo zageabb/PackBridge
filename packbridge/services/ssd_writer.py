@@ -44,6 +44,29 @@ def _q(tag: str) -> str:
     return f"{{{MAIN_NS}}}{tag}"
 
 
+MC_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+
+
+def _normalise_worksheet_ignorable(root: ET.Element) -> None:
+    """Keep mc:Ignorable aligned with namespaces that survive XML serialisation.
+
+    Rewriting a worksheet through ElementTree can drop unused namespace declarations
+    such as xr2/xr3 while preserving the original mc:Ignorable token list. Excel then
+    rejects the worksheet as schema-invalid because mc:Ignorable names undeclared
+    prefixes. PackBridge currently retains x14ac and xr metadata on SoCs_Temp.
+    """
+    key = f"{{{MC_NS}}}Ignorable"
+    if key not in root.attrib:
+        return
+
+    tokens = str(root.attrib.get(key) or "").split()
+    retained = [token for token in tokens if token in {"x14ac", "xr"}]
+    if retained:
+        root.attrib[key] = " ".join(retained)
+    else:
+        root.attrib.pop(key, None)
+
+
 def _parse_xml(payload: bytes) -> ET.Element:
     try:
         for _, namespace in ET.iterparse(io.BytesIO(payload), events=("start-ns",)):
@@ -715,6 +738,7 @@ def write_socs_preview(
                 formula = ET.SubElement(formula_cell, _q("f"))
                 formula.text = f"J{row.excel_row}*K{row.excel_row}*L{row.excel_row}/1000000"
 
+        _normalise_worksheet_ignorable(root)
         replacements[socs_path] = ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
         created_pl = 0
