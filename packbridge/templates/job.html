@@ -672,12 +672,18 @@
         <div>
           <strong>Virtual SSD working dataset</strong>
           {% if issue_counts.BLOCKING %}
-            <span>{{ issue_counts.BLOCKING }} blocking issue(s) must be resolved before SSD generation.</span>
+            <span>{{ issue_counts.BLOCKING }} blocking issue(s) must be resolved before this job is ready for SSD output.</span>
+          {% elif ssd_project %}
+            <span>Working data is ready. Build the validation or production SSD from the linked SSD Project.</span>
           {% else %}
-            <span>Working data can be reviewed now. Final SSD generation remains disabled until the workbook mapping is verified.</span>
+            <span>Working data is ready. Add this mapped job to an SSD Project to generate the final SSD workbook.</span>
           {% endif %}
         </div>
-        <button class="btn btn-primary" disabled>Generate SSD</button>
+        {% if ssd_project %}
+          <a class="btn btn-primary" href="{{ url_for('projects.view', project_id=ssd_project.id) }}#outputs">Open SSD Project</a>
+        {% else %}
+          <a class="btn btn-primary" href="{{ url_for('projects.index') }}">Go to SSD Projects</a>
+        {% endif %}
       </div>
 
     {% else %}
