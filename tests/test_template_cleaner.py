@@ -350,10 +350,25 @@ def test_writer_expands_inspected_template_capacity(tmp_path):
                 target = rel_map[sheet.attrib[rel_key]]
                 generated_parts.append("xl/" + target)
         assert generated_parts
+        revision_namespaces = (
+            "http://schemas.microsoft.com/office/spreadsheetml/2014/revision",
+            "http://schemas.microsoft.com/office/spreadsheetml/2015/revision2",
+            "http://schemas.microsoft.com/office/spreadsheetml/2016/revision3",
+        )
+        mc_ignorable = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable"
+
         for part in generated_parts:
             generated = ET.fromstring(archive.read(part))
             sheet_pr = generated.find("m:sheetPr", ns)
             assert sheet_pr is None or "codeName" not in sheet_pr.attrib
+
+            # Cloned sheets must not retain template revision UUID identities.
+            for node in generated.iter():
+                for namespace in revision_namespaces:
+                    assert f"{{{namespace}}}uid" not in node.attrib
+
+            # The serialised clone only needs x14ac compatibility metadata.
+            assert generated.attrib.get(mc_ignorable) in (None, "x14ac")
 
         # PackBridge changes formulas/sheets, so the source calculation chain must be
         # removed and left for Excel to rebuild.
