@@ -71,7 +71,7 @@ The principal Excel table is:
 - data rows in that reference: **23:90**
 - capacity in that reference: **68 package rows**
 
-PackBridge no longer assumes every valid SSD workbook must have exactly 68 rows. The controlled-template inspector derives the package capacity from the actual Table2 end row, provided the table still starts at C22, ends in column W, and the required validation controls cover the corresponding data rows. For example, Table2 `C22:W38` is treated as a 16-package template rather than rejected solely because it is shorter.
+PackBridge no longer assumes every valid SSD workbook must have exactly 68 rows. The controlled-template inspector derives the initial package capacity from the actual Table2 end row. During generation, if the approved shipment contains more packages than the source template, PackBridge inserts additional SoCs rows before the footer/end marker, extends Table2 and the required validation ranges, preserves row formulas, and writes the larger workbook deterministically. For example, a source template with `C22:W38` can generate a larger output such as `C22:W74` when 52 package rows are required.
 
 Column X is visually part of the worksheet's case-data area but sits outside Table2.
 
@@ -235,7 +235,7 @@ Generated marking labels pull from SoCs data, including:
 - dimensions;
 - Case Number.
 
-The VBA creates one ML sheet per package.
+The historical VBA creates one ML sheet per package. PackBridge now recreates the required per-case PL-/ML- worksheets deterministically by cloning PLs_Temp and MLs_Temp and setting the case selector cells, so validation output does not depend on running VBA.
 
 ## VBA role
 
