@@ -30,11 +30,6 @@ def build_project_preview(
         output.blocking.append("No mapped packing-list jobs are attached to this SSD project.")
         return output
 
-    total_packages = sum(len(item.packing.packages) for item in inputs)
-    if total_packages > 68:
-        output.blocking.append(
-            f"Current template supports 68 package rows; the project contains {total_packages}."
-        )
 
     seen_cases: dict[str, int] = {}
     global_index = 0
@@ -44,17 +39,14 @@ def build_project_preview(
         if not output.header_cells:
             output.header_cells = preview.header_cells
 
-        # build_ssd_preview emits a per-job 68-row capacity warning; the project owns
-        # the aggregate capacity check, so only keep other diagnostics here.
         for message in preview.blocking:
-            if not message.startswith("Current template supports 68 package rows;"):
-                output.blocking.append(f"{input_item.job_title}: {message}")
+            output.blocking.append(f"{input_item.job_title}: {message}")
         for message in preview.warnings:
             output.warnings.append(f"{input_item.job_title}: {message}")
 
         for row in preview.rows:
             row.package_index = global_index
-            row.excel_row = 23 + global_index if global_index < 68 else None
+            row.excel_row = 23 + global_index
             row.source_job_id = input_item.job_id
             row.source_job_title = input_item.job_title
 

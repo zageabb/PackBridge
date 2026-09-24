@@ -61,8 +61,8 @@ The application now includes:
 - an editable provenance-aware Virtual SSD with source evidence, PDF-page verification, validation, acknowledgements, reverts and field/case reprocessing;
 - a job-aware local assistant with evidence grounding, deterministic shipment queries and reviewable Apply/Cancel changes;
 - governed Knowledge/profile learning, versioning, diff/approval, import/export and correction-to-profile proposals;
-- multi-job SSD Projects, controlled template inspection/cleaning/versioning and deterministic SoCs output;
-- structurally/value-verified validation workbooks and an explicitly SAP-gated production generation/download path;
+- multi-job SSD Projects, controlled template inspection/cleaning/versioning, dynamic SoCs row expansion and deterministic per-case PL/ML worksheet creation;
+- structurally/value-verified macro-free XLSX validation workbooks that can grow beyond the source template capacity, plus an explicitly SAP-gated production generation/download path;
 - optional local authentication and centrally enforced roles;
 - rotating logs, database migrations, backup/restore, opt-in retention, health/readiness diagnostics and Ubuntu/UDA deployment packaging;
 - a multi-layout golden benchmark harness for comparing the 14B baseline with smaller local candidates.

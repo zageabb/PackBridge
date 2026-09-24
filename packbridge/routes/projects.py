@@ -36,16 +36,8 @@ def _context(project: SSDProject) -> SSDContext:
 
 
 def _apply_template_capacity(preview, template) -> None:
-    capacity = int(
-        (((template or {}).get("inspection") or {}).get("row_capacity") or 0)
-    )
-    if capacity and len(preview.rows) > capacity:
-        message = (
-            f"Active SSD template supports {capacity} package rows; "
-            f"this project contains {len(preview.rows)}."
-        )
-        if message not in preview.blocking:
-            preview.blocking.append(message)
+    """Capacity is dynamic; the writer expands Table2 to match the preview."""
+    return None
 
 
 def _mapped_inputs(project: SSDProject) -> list[AggregationInput]:
@@ -112,10 +104,7 @@ def view(project_id: int):
         and template.get("available")
         and inspection.get("generation_ready")
     )
-    generation_ready = bool(
-        base_generation_ready
-        and inspection.get("has_vba")
-    )
+    generation_ready = bool(base_generation_ready)
     production_ready = bool(
         base_generation_ready
         and current_app.config.get("SAP_OUTPUT_APPROVED", False)
@@ -285,10 +274,6 @@ def build_validation_workbook(project_id: int):
     if not inspection.get("generation_ready"):
         flash("The active SSD template is not a clean generation template.", "danger")
         return redirect(url_for("settings.index"))
-    if not inspection.get("has_vba"):
-        flash("The first controlled validation writer requires the macro-enabled template.", "danger")
-        return redirect(url_for("settings.index"))
-
     output_root = (
         Path(current_app.config["DATA_ROOT"])
         / "ssd-projects"
@@ -301,7 +286,7 @@ def build_validation_workbook(project_id: int):
         for character in (project.reference or project.name)
     ).strip("-_") or f"project-{project.id}"
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    suffix = Path(template["path"]).suffix.casefold() or ".xlsm"
+    suffix = ".xlsx"
     filename = f"PackBridge-{safe_reference}-VALIDATION-{timestamp}{suffix}"
     destination = output_root / filename
 
@@ -310,7 +295,8 @@ def build_validation_workbook(project_id: int):
             template["path"],
             destination,
             preview,
-            require_vba=True,
+            require_vba=False,
+            generate_case_sheets=True,
         )
     except (SSDWriterError, OSError, ValueError) as exc:
         flash(f"SSD validation workbook was not created: {exc}", "danger")
@@ -391,8 +377,10 @@ def build_production_workbook(project_id: int):
         for character in (project.reference or project.name)
     ).strip("-_") or f"project-{project.id}"
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    suffix = Path(template["path"]).suffix.casefold() or (
-        ".xlsx" if current_app.config.get("SAP_MACRO_FREE_APPROVED", False) else ".xlsm"
+    suffix = (
+        ".xlsx"
+        if current_app.config.get("SAP_MACRO_FREE_APPROVED", False)
+        else (Path(template["path"]).suffix.casefold() or ".xlsm")
     )
     filename = f"PackBridge-{safe_reference}-{timestamp}{suffix}"
     destination = output_root / filename
@@ -403,6 +391,7 @@ def build_production_workbook(project_id: int):
             destination,
             preview,
             require_vba=not current_app.config.get("SAP_MACRO_FREE_APPROVED", False),
+            generate_case_sheets=True,
         )
     except (SSDWriterError, OSError, ValueError) as exc:
         flash(f"Production SSD was not created: {exc}", "danger")
