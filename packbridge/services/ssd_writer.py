@@ -486,7 +486,7 @@ def _make_macro_free(archive: zipfile.ZipFile, replacements: dict[str, bytes]) -
     for name in sorted(set(archive.namelist()) | set(replacements)):
         if not name.startswith("xl/worksheets/") or not name.endswith(".xml"):
             continue
-        payload = replacements.get(name, archive.read(name))
+        payload = replacements[name] if name in replacements else archive.read(name)
         root = _parse_xml(payload)
         changed = False
         for tag in ("controls", "legacyDrawing"):
