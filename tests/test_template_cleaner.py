@@ -85,6 +85,8 @@ def make_populated_template(path):
       <dataValidations count="6">{validations}</dataValidations>
     </worksheet>'''
     empty = f'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="{MAIN}"><sheetData/></worksheet>'
+    pl_template = f'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="{MAIN}"><sheetPr codeName="Sheet2"/><sheetData/></worksheet>'
+    ml_template = f'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="{MAIN}"><sheetPr codeName="Sheet3"/><sheetData/></worksheet>'
     table = f'''<?xml version="1.0" encoding="UTF-8"?>
     <table xmlns="{MAIN}" id="2" name="Table2" displayName="Table2" ref="C22:W90" totalsRowShown="0">
       <tableColumns count="1"><tableColumn id="1" name="(Always 1)"/></tableColumns>
@@ -109,9 +111,9 @@ def make_populated_template(path):
         archive.writestr("xl/workbook.xml", workbook)
         archive.writestr("xl/_rels/workbook.xml.rels", rels)
         archive.writestr("xl/worksheets/sheet1.xml", sheet1)
-        archive.writestr("xl/worksheets/sheet2.xml", empty)
+        archive.writestr("xl/worksheets/sheet2.xml", pl_template)
         archive.writestr("xl/worksheets/sheet3.xml", empty)
-        archive.writestr("xl/worksheets/sheet4.xml", empty)
+        archive.writestr("xl/worksheets/sheet4.xml", ml_template)
         archive.writestr("xl/worksheets/sheet5.xml", empty)
         archive.writestr("xl/tables/table1.xml", table)
         archive.writestr("xl/calcChain.xml", calc_chain)
@@ -333,6 +335,34 @@ def test_writer_expands_inspected_template_capacity(tmp_path):
         assert cells["S24"].find("m:is/m:t", ns).text == "C2"
         assert cells["M24"].find("m:f", ns).text == "J24*K24*L24/1000000"
 
+        # Generated case sheets must not duplicate the template worksheets' internal
+        # VBA/Excel codeName values (Sheet2/Sheet3), which Excel treats as corrupt.
+        workbook = ET.fromstring(archive.read("xl/workbook.xml"))
+        rels = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+        rel_map = {
+            node.attrib["Id"]: node.attrib["Target"]
+            for node in rels.findall(f"{{{PKG}}}Relationship")
+        }
+        rel_key = f"{{{REL}}}id"
+        generated_parts = []
+        for sheet in workbook.find("m:sheets", ns):
+            if sheet.attrib["name"].startswith(("PL-", "ML-")):
+                target = rel_map[sheet.attrib[rel_key]]
+                generated_parts.append("xl/" + target)
+        assert generated_parts
+        for part in generated_parts:
+            generated = ET.fromstring(archive.read(part))
+            sheet_pr = generated.find("m:sheetPr", ns)
+            assert sheet_pr is None or "codeName" not in sheet_pr.attrib
+
+        # PackBridge changes formulas/sheets, so the source calculation chain must be
+        # removed and left for Excel to rebuild.
+        assert "xl/calcChain.xml" not in archive.namelist()
+        workbook_rels = archive.read("xl/_rels/workbook.xml.rels").decode("utf-8")
+        assert "calcChain" not in workbook_rels
+        content_types = archive.read("[Content_Types].xml").decode("utf-8")
+        assert "/xl/calcChain.xml" not in content_types
+
 
 def test_writer_can_create_macro_free_xlsx_from_xlsm_template(tmp_path):
     populated = tmp_path / "populated.xlsm"
@@ -372,6 +402,22 @@ def test_writer_can_create_macro_free_xlsx_from_xlsm_template(tmp_path):
     assert result["has_vba"] is False
     assert result["pl_sheets_created"] == 1
     assert result["ml_sheets_created"] == 1
+    with zipfile.ZipFile(output) as archive:
+        assert "xl/calcChain.xml" not in archive.namelist()
+        generated = [
+            name
+            for name in archive.namelist()
+            if name.startswith("xl/worksheets/sheet") and name.endswith(".xml")
+        ]
+        code_names = []
+        ns = {"m": MAIN}
+        for name in generated:
+            root = ET.fromstring(archive.read(name))
+            sheet_pr = root.find("m:sheetPr", ns)
+            if sheet_pr is not None and sheet_pr.attrib.get("codeName"):
+                code_names.append(sheet_pr.attrib["codeName"])
+        assert len(code_names) == len(set(code_names))
+
     after = inspect_template(output)
     assert after.compatible is True
     assert after.has_vba is False
