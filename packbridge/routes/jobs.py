@@ -429,7 +429,7 @@ def view(job_id: int):
         last_mapping_model=last_mapping_model,
         can_delete_failed=can_delete_failed_job(job),
         selected_ssd_override=(
-            ssd_context.case_overrides.get(
+            ssd_local_context.case_overrides.get(
                 str((((selected or {}).get("case_number") or {}).get("working") or {}).get("value") or "")
             )
             if selected
