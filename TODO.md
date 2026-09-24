@@ -140,7 +140,9 @@ This is the working implementation backlog. Keep it updated as features are comp
 - [x] Implement template version management.
 - [x] Implement deterministic canonical → SSD mapping for every physically verified SoCs field and approved project/default context. *(No unverified PL/ML cell mapping is guessed.)*
 - [x] Write only permitted values/locations.
-- [x] Preserve required formatting/formulas/validations/named structures.
+- [x] Preserve required formulas/validations/named structures while allowing non-critical presentation formatting to vary.
+- [x] Dynamically expand SoCs Table2 and validation ranges beyond the source template package capacity.
+- [x] Deterministically clone PLs_Temp / MLs_Temp into per-case PL-/ML- worksheets without invoking VBA.
 - [x] Support macro-free generation when a compatible XLSX template is installed and the explicit SAP macro-free release gate is enabled.
 - [x] Run post-generation workbook structural checks.
 - [x] Store output metadata/hash with SSD project.
