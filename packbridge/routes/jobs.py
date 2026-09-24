@@ -349,6 +349,13 @@ def view(job_id: int):
     ssd_context = _ssd_context(job)
     ssd_local_context = _local_ssd_context(job)
     ssd_project_context, ssd_project = _project_ssd_context(job)
+    ssd_local_has_header_defaults = any(
+        value not in (None, "")
+        for value in (
+            list(ssd_local_context.header.model_dump().values())
+            + list(ssd_local_context.defaults.model_dump().values())
+        )
+    )
     ssd_preview = None
 
     if job.working_json:
@@ -421,6 +428,7 @@ def view(job_id: int):
         ssd_local_context=ssd_local_context,
         ssd_project_context=ssd_project_context,
         ssd_project=ssd_project,
+        ssd_local_has_header_defaults=ssd_local_has_header_defaults,
         ssd_preview=ssd_preview,
         profile_knowledge_path=profile_knowledge_path,
         learning_recommended=learning_recommended,
@@ -1315,6 +1323,38 @@ def update_ssd_context(job_id: int):
     )
     db.session.commit()
     flash("SSD project/default context saved.", "success")
+    return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
+
+
+@bp.post("/<int:job_id>/ssd-context/inherit-project")
+def inherit_ssd_project_context(job_id: int):
+    job = Job.query.get_or_404(job_id)
+    project_context, project = _project_ssd_context(job)
+    if project is None:
+        flash("This job is not attached to an SSD Project.", "warning")
+        return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
+
+    local = _local_ssd_context(job)
+    local.header = type(local.header)()
+    local.defaults = type(local.defaults)()
+
+    record = SSDContextRecord.query.filter_by(job_id=job.id).first()
+    if record is None:
+        record = SSDContextRecord(job_id=job.id)
+        db.session.add(record)
+    record.context_json = local.model_dump_json()
+    record.updated_by = "user"
+
+    _audit(
+        job.id,
+        "ssd_project_context_inherited",
+        f"Inherited SSD header/default context from project {project.name}",
+        {"project_id": project.id, "project_name": project.name},
+        actor="user",
+    )
+    db.session.commit()
+
+    flash(f"Now inheriting SSD project/default values from {project.name}.", "success")
     return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
 
 
