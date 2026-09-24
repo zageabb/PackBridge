@@ -368,6 +368,13 @@ def _strip_clone_relationships(root: ET.Element) -> None:
     if page_setup is not None:
         page_setup.attrib.pop(f"{{{REL_NS}}}id", None)
 
+    # A cloned worksheet must not keep the template sheet's internal codeName.
+    # Reusing Sheet2/Sheet3 across every PL/ML clone creates duplicate worksheet
+    # identities that Excel repairs as corrupt workbook content.
+    sheet_pr = root.find(_q("sheetPr"))
+    if sheet_pr is not None:
+        sheet_pr.attrib.pop("codeName", None)
+
 
 def _clone_case_sheet(payload: bytes, selector_ref: str, case_number: str) -> bytes:
     root = _parse_xml(payload)
@@ -478,6 +485,50 @@ def _add_case_sheets(
         content_types, encoding="utf-8", xml_declaration=True
     )
     return created_pl, created_ml
+
+
+def _remove_stale_calc_chain(
+    archive: zipfile.ZipFile,
+    replacements: dict[str, bytes],
+) -> set[str]:
+    """Drop the template calculation chain after changing formulas/sheets.
+
+    Excel safely rebuilds calcChain.xml. Keeping the source chain after adding rows
+    and cloned PL/ML worksheets can leave stale formula references and trigger a
+    workbook repair prompt.
+    """
+    skipped: set[str] = set()
+    calc_chain = "xl/calcChain.xml"
+    if calc_chain in archive.namelist():
+        skipped.add(calc_chain)
+
+    rels_name = "xl/_rels/workbook.xml.rels"
+    rels = _parse_xml(replacements.get(rels_name, archive.read(rels_name)))
+    changed_rels = False
+    for rel in list(rels):
+        rel_type = rel.attrib.get("Type", "")
+        target = rel.attrib.get("Target", "")
+        if rel_type.endswith("/calcChain") or target.endswith("calcChain.xml"):
+            rels.remove(rel)
+            changed_rels = True
+    if changed_rels:
+        replacements[rels_name] = ET.tostring(
+            rels, encoding="utf-8", xml_declaration=True
+        )
+
+    types_name = "[Content_Types].xml"
+    content_types = _parse_xml(replacements.get(types_name, archive.read(types_name)))
+    changed_types = False
+    for node in list(content_types):
+        if node.attrib.get("PartName") == "/xl/calcChain.xml":
+            content_types.remove(node)
+            changed_types = True
+    if changed_types:
+        replacements[types_name] = ET.tostring(
+            content_types, encoding="utf-8", xml_declaration=True
+        )
+
+    return skipped
 
 
 def _make_macro_free(archive: zipfile.ZipFile, replacements: dict[str, bytes]) -> set[str]:
@@ -645,9 +696,11 @@ def write_socs_preview(
         if generate_case_sheets and preview.rows:
             created_pl, created_ml = _add_case_sheets(archive, replacements, preview)
 
-        skipped_parts: set[str] = set()
+        # Formula-bearing rows and PL/ML worksheets have changed, so the template's
+        # calculation chain is no longer authoritative. Excel will rebuild it.
+        skipped_parts: set[str] = _remove_stale_calc_chain(archive, replacements)
         if macro_free_output:
-            skipped_parts = _make_macro_free(archive, replacements)
+            skipped_parts |= _make_macro_free(archive, replacements)
 
         destination.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
