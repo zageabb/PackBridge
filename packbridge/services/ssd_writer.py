@@ -375,6 +375,32 @@ def _strip_clone_relationships(root: ET.Element) -> None:
     if sheet_pr is not None:
         sheet_pr.attrib.pop("codeName", None)
 
+    # Excel revision UUIDs are also identity-bearing metadata. Cloning them verbatim
+    # duplicates the same xr:uid across every generated worksheet (and, for PL sheets,
+    # across cloned dataValidation nodes). Strip revision identity metadata entirely;
+    # Excel can regenerate it if needed.
+    revision_namespaces = (
+        "http://schemas.microsoft.com/office/spreadsheetml/2014/revision",
+        "http://schemas.microsoft.com/office/spreadsheetml/2015/revision2",
+        "http://schemas.microsoft.com/office/spreadsheetml/2016/revision3",
+    )
+    revision_attr_names = {
+        f"{{{namespace}}}uid"
+        for namespace in revision_namespaces
+    }
+    for node in root.iter():
+        for attribute in list(node.attrib):
+            if attribute in revision_attr_names:
+                node.attrib.pop(attribute, None)
+
+    # ElementTree omits unused namespace declarations when serialising. The source
+    # template's mc:Ignorable may still mention xr/xr2/xr3 even after those namespaces
+    # disappear, which Excel can flag during repair. Retain only x14ac, which is still
+    # used by the cloned worksheet formatting metadata.
+    mc_ignorable = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable"
+    if mc_ignorable in root.attrib:
+        root.attrib[mc_ignorable] = "x14ac"
+
 
 def _clone_case_sheet(payload: bytes, selector_ref: str, case_number: str) -> bytes:
     root = _parse_xml(payload)
