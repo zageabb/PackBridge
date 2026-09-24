@@ -347,6 +347,8 @@ def view(job_id: int):
     counts = {"INFO": 0, "WARNING": 0, "BLOCKING": 0}
     resolved_warning_count = 0
     ssd_context = _ssd_context(job)
+    ssd_local_context = _local_ssd_context(job)
+    ssd_project_context, ssd_project = _project_ssd_context(job)
     ssd_preview = None
 
     if job.working_json:
@@ -416,6 +418,9 @@ def view(job_id: int):
         resolved_warning_count=resolved_warning_count,
         audit_events=audit_events,
         ssd_context=ssd_context,
+        ssd_local_context=ssd_local_context,
+        ssd_project_context=ssd_project_context,
+        ssd_project=ssd_project,
         ssd_preview=ssd_preview,
         profile_knowledge_path=profile_knowledge_path,
         learning_recommended=learning_recommended,
@@ -1231,7 +1236,7 @@ def propose_field_learning(job_id: int):
 @bp.post("/<int:job_id>/ssd-context")
 def update_ssd_context(job_id: int):
     job = Job.query.get_or_404(job_id)
-    context = _ssd_context(job)
+    context = _local_ssd_context(job)
 
     header_fields = (
         "currency",
@@ -1335,7 +1340,7 @@ def update_ssd_case_context(job_id: int):
         flash("The selected case is not present in the current working dataset.", "danger")
         return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
 
-    context = _ssd_context(job)
+    context = _local_ssd_context(job)
     values = (
         context.case_overrides.get(case_number).model_dump()
         if case_number in context.case_overrides
@@ -1505,7 +1510,7 @@ def reset_ssd_case_context(job_id: int):
         flash("Case number is required.", "danger")
         return redirect(url_for("jobs.view", job_id=job.id) + "#output-preview")
 
-    context = _ssd_context(job)
+    context = _local_ssd_context(job)
     existed = context.case_overrides.pop(case_number, None) is not None
     record = SSDContextRecord.query.filter_by(job_id=job.id).first()
     if record is None:
