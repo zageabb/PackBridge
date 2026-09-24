@@ -158,6 +158,8 @@ def test_mapped_job_inherits_live_ssd_project_context(tmp_path):
     assert b"PROJECT ALPHA" in inherited.data
     assert b"PALLET" in inherited.data
     assert b"Edit SSD Project values" in inherited.data
+    assert b"Open SSD Project" in inherited.data
+    assert b"Generate SSD" not in inherited.data
 
     # Project changes remain live rather than being copied into the job.
     client.post(
