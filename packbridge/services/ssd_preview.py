@@ -165,11 +165,6 @@ def build_ssd_preview(packing: PackingList, context: SSDContext | None = None) -
         "T13": header.delivery_location,
     }
 
-    if len(packing.packages) > 68:
-        preview.blocking.append(
-            f"Current template supports 68 package rows; this job contains {len(packing.packages)}."
-        )
-
     for issue in packing.issues:
         text = f"{issue.code}: {issue.message}"
         if issue.severity == "BLOCKING":
@@ -192,7 +187,7 @@ def build_ssd_preview(packing: PackingList, context: SSDContext | None = None) -
         row = SoCsPreviewRow(
             package_index=index,
             case_number=case_number,
-            excel_row=23 + index if index < 68 else None,
+            excel_row=23 + index,
         )
         row.columns["C"] = 1
         row.origins["C"] = "verified_default"
