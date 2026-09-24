@@ -81,7 +81,7 @@ def test_project_preview_blocks_case_duplicates_between_jobs():
     assert any("CASE-1" in message and "more than one" in message for message in preview.blocking)
 
 
-def test_project_preview_blocks_more_than_template_capacity():
+def test_project_preview_allows_more_than_legacy_template_capacity():
     inputs = [
         AggregationInput(index, f"Job {index}", packing(f"CASE-{index}", "4501", str(index)))
         for index in range(1, 70)
@@ -90,5 +90,5 @@ def test_project_preview_blocks_more_than_template_capacity():
     preview = build_project_preview(inputs, complete_context())
 
     assert len(preview.rows) == 69
-    assert preview.rows[-1].excel_row is None
-    assert any("supports 68 package rows" in message for message in preview.blocking)
+    assert preview.rows[-1].excel_row == 91
+    assert not any("package rows" in message for message in preview.blocking)
