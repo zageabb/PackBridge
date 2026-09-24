@@ -145,7 +145,7 @@ def _selected_package(packages: list[dict], selected_case: str | None):
     return packages[0], 0
 
 
-def _ssd_context(job: Job) -> SSDContext:
+def _local_ssd_context(job: Job) -> SSDContext:
     record = SSDContextRecord.query.filter_by(job_id=job.id).first()
     if not record or not record.context_json:
         return SSDContext()
@@ -153,6 +153,55 @@ def _ssd_context(job: Job) -> SSDContext:
         return SSDContext.model_validate_json(record.context_json)
     except ValueError:
         return SSDContext()
+
+
+def _project_ssd_context(job: Job) -> tuple[SSDContext, object | None]:
+    link = getattr(job, "ssd_project_link", None)
+    project = getattr(link, "project", None) if link is not None else None
+    if project is None or not project.context_json:
+        return SSDContext(), project
+    try:
+        return SSDContext.model_validate_json(project.context_json), project
+    except ValueError:
+        return SSDContext(), project
+
+
+def _merge_context_model(base, override):
+    values = base.model_dump()
+    for name, value in override.model_dump().items():
+        if value not in (None, ""):
+            values[name] = value
+    return type(base).model_validate(values)
+
+
+def _ssd_context(job: Job) -> SSDContext:
+    """Return the effective job SSD context.
+
+    An attached SSD Project supplies the inherited header/default context. Values
+    explicitly stored against the job override that inherited base. Project and
+    job case overrides are then merged, with job-specific case values winning.
+    """
+    local = _local_ssd_context(job)
+    project_context, _ = _project_ssd_context(job)
+
+    header = _merge_context_model(project_context.header, local.header)
+    defaults = _merge_context_model(project_context.defaults, local.defaults)
+
+    case_overrides = dict(project_context.case_overrides)
+    for case_number, local_override in local.case_overrides.items():
+        if case_number in case_overrides:
+            case_overrides[case_number] = _merge_context_model(
+                case_overrides[case_number],
+                local_override,
+            )
+        else:
+            case_overrides[case_number] = local_override
+
+    return SSDContext(
+        header=header,
+        defaults=defaults,
+        case_overrides=case_overrides,
+    )
 
 
 def _form_text(name: str) -> str | None:
