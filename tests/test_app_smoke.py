@@ -155,6 +155,87 @@ def test_case_specific_ssd_override_round_trip(tmp_path):
 
 
 
+def test_case_values_can_be_promoted_to_defaults_for_all_cases(tmp_path):
+    TestConfig = type(
+        "TestConfig",
+        (Config,),
+        {
+            "TESTING": True,
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///" + str(tmp_path / "test.sqlite3"),
+            "DATA_ROOT": tmp_path / "data",
+            "KNOWLEDGE_ROOT": tmp_path / "knowledge",
+            "TEMPLATE_ROOT": tmp_path / "templates",
+        },
+    )
+    app = create_app(TestConfig)
+
+    from packbridge.models import SSDContextRecord
+    from packbridge.schemas import FieldValue, Package, PackingList, SourceValue, WorkingValue
+    from packbridge.ssd_schemas import SSDCaseContext, SSDContext
+
+    def field(value):
+        return FieldValue(
+            source=SourceValue(value=value),
+            working=WorkingValue(value=value, origin="source"),
+        )
+
+    with app.app_context():
+        packing = PackingList(
+            packages=[
+                Package(case_number=field("CASE-1"), gross_weight=field(10), net_weight=field(9)),
+                Package(case_number=field("CASE-2"), gross_weight=field(12), net_weight=field(11)),
+            ]
+        )
+        job = Job(title="Apply All Job", status="mapped", working_json=packing.model_dump_json())
+        db.session.add(job)
+        db.session.flush()
+
+        context = SSDContext(
+            case_overrides={
+                "CASE-1": SSDCaseContext(packaging_material="WOODEN_BOX", remarks="Keep case 1 note"),
+                "CASE-2": SSDCaseContext(packaging_material="BUNDLE", remarks="Keep case 2 note"),
+            }
+        )
+        db.session.add(
+            SSDContextRecord(
+                job_id=job.id,
+                context_json=context.model_dump_json(),
+                updated_by="test",
+            )
+        )
+        db.session.commit()
+        job_id = job.id
+
+    client = app.test_client()
+    response = client.post(
+        f"/jobs/{job_id}/ssd-context/case/apply-all",
+        data={
+            "case_number": "CASE-1",
+            "case_packaging_material": "PALLET",
+            "case_stackability": "Stackable 2 tier",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Applied 2 SSD value(s) to all cases as defaults." in response.data
+    assert b"Save defaults for all cases" in response.data
+
+    with app.app_context():
+        record = SSDContextRecord.query.filter_by(job_id=job_id).first()
+        context = SSDContext.model_validate_json(record.context_json)
+
+        assert context.defaults.packaging_material == "PALLET"
+        assert context.defaults.stackability == "Stackable 2 tier"
+
+        assert context.case_overrides["CASE-1"].packaging_material is None
+        assert context.case_overrides["CASE-1"].remarks == "Keep case 1 note"
+        assert context.case_overrides["CASE-2"].packaging_material is None
+        assert context.case_overrides["CASE-2"].remarks == "Keep case 2 note"
+
+
+
+
 def test_assistant_proposal_requires_explicit_apply_or_reject(tmp_path):
     TestConfig = type(
         "TestConfig",
