@@ -335,6 +335,13 @@ def test_writer_expands_inspected_template_capacity(tmp_path):
         assert cells["S24"].find("m:is/m:t", ns).text == "C2"
         assert cells["M24"].find("m:f", ns).text == "J24*K24*L24/1000000"
 
+        # Rewritten SoCs_Temp must not retain mc:Ignorable prefixes whose
+        # namespace declarations ElementTree has dropped (Excel repairs the sheet).
+        sheet1_xml = archive.read("xl/worksheets/sheet1.xml").decode("utf-8")
+        assert 'mc:Ignorable="x14ac xr"' in sheet1_xml or 'mc:Ignorable="xr x14ac"' in sheet1_xml
+        assert "xr2" not in sheet1_xml.split(">", 1)[0]
+        assert "xr3" not in sheet1_xml.split(">", 1)[0]
+
         # Generated case sheets must not duplicate the template worksheets' internal
         # VBA/Excel codeName values (Sheet2/Sheet3), which Excel treats as corrupt.
         workbook = ET.fromstring(archive.read("xl/workbook.xml"))
