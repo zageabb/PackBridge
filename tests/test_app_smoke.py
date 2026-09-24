@@ -93,6 +93,125 @@ def test_mapped_job_can_be_attached_to_project(tmp_path):
 
 
 
+def test_mapped_job_inherits_live_ssd_project_context(tmp_path):
+    TestConfig = type(
+        "TestConfig",
+        (Config,),
+        {
+            "TESTING": True,
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///" + str(tmp_path / "test.sqlite3"),
+            "DATA_ROOT": tmp_path / "data",
+            "KNOWLEDGE_ROOT": tmp_path / "knowledge",
+            "TEMPLATE_ROOT": tmp_path / "templates",
+        },
+    )
+    app = create_app(TestConfig)
+
+    from packbridge.models import SSDContextRecord
+    from packbridge.schemas import FieldValue, Package, PackingList, SourceValue, WorkingValue
+    from packbridge.ssd_schemas import SSDCaseContext, SSDContext, SSDHeaderContext
+
+    def field(value):
+        return FieldValue(
+            source=SourceValue(value=value),
+            working=WorkingValue(value=value, origin="source"),
+        )
+
+    with app.app_context():
+        packing = PackingList(
+            packages=[
+                Package(
+                    case_number=field("CASE-INHERIT"),
+                    gross_weight=field(10),
+                    net_weight=field(9),
+                )
+            ]
+        )
+        job = Job(title="Inherited Job", status="mapped", working_json=packing.model_dump_json())
+        db.session.add(job)
+        db.session.commit()
+        job_id = job.id
+
+    client = app.test_client()
+    create = client.post("/projects/", data={"name": "Inherited SSD Project"}, follow_redirects=False)
+    project_id = int(create.headers["Location"].rstrip("/").split("/")[-1])
+
+    client.post(
+        f"/projects/{project_id}/context",
+        data={
+            "header_project_name": "PROJECT ALPHA",
+            "header_delivery_location": "STAFFORD",
+            "default_packaging_material": "PALLET",
+            "default_stackability": "Stackable 2 tier",
+        },
+        follow_redirects=False,
+    )
+    client.post(
+        f"/projects/{project_id}/jobs",
+        data={"job_id": job_id},
+        follow_redirects=False,
+    )
+
+    inherited = client.get(f"/jobs/{job_id}")
+    assert inherited.status_code == 200
+    assert b"Inherited from SSD Project: Inherited SSD Project" in inherited.data
+    assert b"PROJECT ALPHA" in inherited.data
+    assert b"PALLET" in inherited.data
+    assert b"Edit SSD Project values" in inherited.data
+
+    # Project changes remain live rather than being copied into the job.
+    client.post(
+        f"/projects/{project_id}/context",
+        data={
+            "header_project_name": "PROJECT BETA",
+            "header_delivery_location": "BIRMINGHAM",
+            "default_packaging_material": "WOODEN_BOX",
+            "default_stackability": "Not stackable",
+        },
+        follow_redirects=False,
+    )
+    changed = client.get(f"/jobs/{job_id}")
+    assert b"PROJECT BETA" in changed.data
+    assert b"WOODEN_BOX" in changed.data
+
+    # Older local job values can be explicitly discarded while case overrides survive.
+    with app.app_context():
+        db.session.add(
+            SSDContextRecord(
+                job_id=job_id,
+                context_json=SSDContext(
+                    header=SSDHeaderContext(project_name="OLD LOCAL PROJECT"),
+                    defaults=SSDCaseContext(packaging_material="BUNDLE"),
+                    case_overrides={
+                        "CASE-INHERIT": SSDCaseContext(remarks="Keep this case note")
+                    },
+                ).model_dump_json(),
+                updated_by="test",
+            )
+        )
+        db.session.commit()
+
+    localised = client.get(f"/jobs/{job_id}")
+    assert b"OLD LOCAL PROJECT" in localised.data
+    assert b"Use SSD Project values" in localised.data
+
+    reset = client.post(
+        f"/jobs/{job_id}/ssd-context/inherit-project",
+        follow_redirects=True,
+    )
+    assert reset.status_code == 200
+    assert b"PROJECT BETA" in reset.data
+    assert b"OLD LOCAL PROJECT" not in reset.data
+
+    with app.app_context():
+        record = SSDContextRecord.query.filter_by(job_id=job_id).first()
+        context = SSDContext.model_validate_json(record.context_json)
+        assert context.header.project_name is None
+        assert context.defaults.packaging_material is None
+        assert context.case_overrides["CASE-INHERIT"].remarks == "Keep this case note"
+
+
+
 def test_case_specific_ssd_override_round_trip(tmp_path):
     TestConfig = type(
         "TestConfig",
