@@ -247,9 +247,7 @@ def test_guarded_writer_populates_clean_template_and_preserves_vba(tmp_path):
 
 
 
-def test_writer_uses_inspected_template_capacity(tmp_path):
-    from packbridge.services.ssd_writer import SSDWriterError
-    import pytest
+def test_writer_expands_inspected_template_capacity(tmp_path):
 
     populated = tmp_path / "populated.xlsm"
     make_populated_template(populated)
@@ -309,5 +307,71 @@ def test_writer_uses_inspected_template_capacity(tmp_path):
     )
     preview = build_ssd_preview(packing, context)
 
-    with pytest.raises(SSDWriterError, match="supports 1"):
-        write_socs_preview(clean, tmp_path / "out.xlsm", preview)
+    output = tmp_path / "out.xlsm"
+    result = write_socs_preview(clean, output, preview)
+
+    assert result["original_capacity"] == 1
+    assert result["output_capacity"] == 2
+    assert result["rows_added"] == 1
+    assert result["pl_sheets_created"] == 2
+    assert result["ml_sheets_created"] == 2
+
+    after = inspect_template(output)
+    assert after.compatible is True
+    assert after.row_capacity == 2
+    assert after.generated_pl_count == 2
+    assert after.generated_ml_count == 2
+
+    with zipfile.ZipFile(output) as archive:
+        root = ET.fromstring(archive.read("xl/worksheets/sheet1.xml"))
+        ns = {"m": MAIN}
+        cells = {
+            cell.attrib.get("r"): cell
+            for cell in root.findall(".//m:c", ns)
+        }
+        assert cells["S23"].find("m:is/m:t", ns).text == "C1"
+        assert cells["S24"].find("m:is/m:t", ns).text == "C2"
+        assert cells["M24"].find("m:f", ns).text == "J24*K24*L24/1000000"
+
+
+def test_writer_can_create_macro_free_xlsx_from_xlsm_template(tmp_path):
+    populated = tmp_path / "populated.xlsm"
+    clean = tmp_path / "clean.xlsm"
+    output = tmp_path / "output.xlsx"
+    make_populated_template(populated)
+    create_clean_generation_template(populated, clean)
+
+    def field(value, unit=None):
+        return FieldValue(
+            source=SourceValue(value=value, unit=unit),
+            working=WorkingValue(value=value, unit=unit, origin="source"),
+        )
+
+    packing = PackingList(
+        packages=[
+            Package(case_number=field("CASE-X"), net_weight=field(1, "KG"), gross_weight=field(2, "KG")),
+        ]
+    )
+    context = SSDContext(
+        defaults=SSDCaseContext(
+            content_description="QBANK",
+            equipment_group="011",
+            declare_as="System",
+            purchase_order="4500000001",
+            purchase_order_position="10",
+            storage_requirement="Outdoor",
+            packaging_material="PALLET",
+            stackability="Stackable 1 tier",
+            dangerous_goods="N",
+        )
+    )
+    preview = build_ssd_preview(packing, context)
+
+    result = write_socs_preview(clean, output, preview, require_vba=False)
+
+    assert result["has_vba"] is False
+    assert result["pl_sheets_created"] == 1
+    assert result["ml_sheets_created"] == 1
+    after = inspect_template(output)
+    assert after.compatible is True
+    assert after.has_vba is False
