@@ -481,6 +481,36 @@ def _add_case_sheets(
 
 
 def _make_macro_free(archive: zipfile.ZipFile, replacements: dict[str, bytes]) -> set[str]:
+    # Remove VBA and ActiveX controls that cannot be relied on in a clean XLSX output.
+    # Core workbook data, formulas, validations, tables and ordinary drawings remain.
+    for name in sorted(set(archive.namelist()) | set(replacements)):
+        if not name.startswith("xl/worksheets/") or not name.endswith(".xml"):
+            continue
+        payload = replacements.get(name, archive.read(name))
+        root = _parse_xml(payload)
+        changed = False
+        for tag in ("controls", "legacyDrawing"):
+            node = root.find(_q(tag))
+            if node is not None:
+                root.remove(node)
+                changed = True
+        if changed:
+            replacements[name] = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+    for name in archive.namelist():
+        if not name.startswith("xl/worksheets/_rels/") or not name.endswith(".rels"):
+            continue
+        rels = _parse_xml(replacements.get(name, archive.read(name)))
+        changed = False
+        for rel in list(rels):
+            rel_type = rel.attrib.get("Type", "")
+            target = rel.attrib.get("Target", "")
+            if "/control" in rel_type or "activeX" in target:
+                rels.remove(rel)
+                changed = True
+        if changed:
+            replacements[name] = ET.tostring(rels, encoding="utf-8", xml_declaration=True)
+
     workbook_rels = _parse_xml(
         replacements.get("xl/_rels/workbook.xml.rels", archive.read("xl/_rels/workbook.xml.rels"))
     )
@@ -498,7 +528,7 @@ def _make_macro_free(archive: zipfile.ZipFile, replacements: dict[str, bytes]) -
     )
     for node in list(content_types):
         part_name = node.attrib.get("PartName", "")
-        if "vbaProject" in part_name:
+        if "vbaProject" in part_name or part_name.startswith("/xl/activeX/"):
             content_types.remove(node)
             continue
         if part_name == "/xl/workbook.xml":
@@ -510,9 +540,12 @@ def _make_macro_free(archive: zipfile.ZipFile, replacements: dict[str, bytes]) -
     return {
         name
         for name in archive.namelist()
-        if name.startswith("xl/vbaProject") or name.startswith("xl/_rels/vbaProject")
+        if (
+            name.startswith("xl/vbaProject")
+            or name.startswith("xl/_rels/vbaProject")
+            or name.startswith("xl/activeX/")
+        )
     }
-
 
 def write_socs_preview(
     template: str | Path,
