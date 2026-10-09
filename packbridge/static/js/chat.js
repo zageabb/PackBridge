@@ -1,4 +1,8 @@
 (() => {
+  // Resolve root-style backend paths against the app prefix, not the origin.
+  const packbridgeUrl = (url) => typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')
+    ? new URL(url.replace(/^\\/+/, ''), document.baseURI).toString() : url;
+  const prefixedFetch = (url, options) => fetch(packbridgeUrl(url), options);
   const shell = document.getElementById("job-shell");
   if (!shell || !window.PACKBRIDGE_JOB) return;
 
@@ -9,7 +13,7 @@
   const history = document.getElementById("chat-history");
 
   async function postJson(url) {
-    const response = await fetch(url, {
+    const response = await prefixedFetch(url, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: "{}"
@@ -146,7 +150,7 @@
 
   async function loadHistory() {
     try {
-      const response = await fetch("/jobs/" + window.PACKBRIDGE_JOB.id + "/chat/history");
+      const response = await prefixedFetch("/jobs/" + window.PACKBRIDGE_JOB.id + "/chat/history");
       if (!response.ok) return;
       const payload = await response.json();
       if (!payload.messages?.length) return;
@@ -172,7 +176,7 @@
     button.textContent = "Working…";
 
     try {
-      const response = await fetch("/jobs/" + window.PACKBRIDGE_JOB.id + "/chat", {
+      const response = await prefixedFetch("/jobs/" + window.PACKBRIDGE_JOB.id + "/chat", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
