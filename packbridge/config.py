@@ -36,6 +36,8 @@ class Config:
             Path.home() / ".config" / "packbridge" / "users.json",
         )
     ).expanduser().resolve()
+    SESSION_COOKIE_NAME = "packbridge_session"
+    SESSION_COOKIE_PATH = os.getenv("PACKBRIDGE_COOKIE_PATH", "/")
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = os.getenv("PACKBRIDGE_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes", "on"}
