@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from flask import Flask, jsonify, redirect, request, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .config import Config
 from .extensions import db, migrate
@@ -11,6 +12,9 @@ from .extensions import db, migrate
 def create_app(config_object: type[Config] = Config) -> Flask:
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_object)
+    # Trust a single locally controlled reverse proxy; do not expose this backend
+    # to untrusted clients able to forge forwarded headers.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
 
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
     Path(app.config["DATA_ROOT"]).mkdir(parents=True, exist_ok=True)

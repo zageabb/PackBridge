@@ -1,4 +1,8 @@
 (() => {
+  // Resolve root-style backend paths against the app prefix, not the origin.
+  const packbridgeUrl = (url) => typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')
+    ? new URL(url.replace(/^\\/+/, ''), document.baseURI).toString() : url;
+  const prefixedFetch = (url, options) => fetch(packbridgeUrl(url), options);
   const context = window.PACKBRIDGE_JOB;
   const shell = document.getElementById("job-shell");
   if (!context || !shell) return;
@@ -113,7 +117,7 @@
     const poll = async () => {
       while (polling) {
         try {
-          const response = await fetch("/jobs/" + context.id + "/processing-status", {
+          const response = await prefixedFetch("/jobs/" + context.id + "/processing-status", {
             cache: "no-store"
           });
           if (response.ok) {
@@ -128,7 +132,7 @@
     const pollPromise = poll();
 
     try {
-      const response = await fetch(processForm.action, {
+      const response = await prefixedFetch(processForm.action, {
         method: "POST",
         headers: {"X-PackBridge-Async": "1"},
         body: new FormData(processForm)
@@ -146,7 +150,7 @@
         }]
       });
       window.setTimeout(() => {
-        window.location.href = payload.redirect || ("/jobs/" + context.id);
+        window.location.href = packbridgeUrl(payload.redirect || ("/jobs/" + context.id));
       }, 350);
     } catch (error) {
       if (progressTitle) progressTitle.textContent = error.message || String(error);
@@ -293,7 +297,7 @@
     sourceSubtitle.textContent = "Loading retained source evidence…";
     sourceResults.innerHTML = "";
     try {
-      const response = await fetch(
+      const response = await prefixedFetch(
         "/jobs/" + context.id + "/source-evidence?locator=" + encodeURIComponent(locator)
       );
       const payload = await response.json().catch(() => ({}));
@@ -340,7 +344,7 @@
   });
 
   async function postJson(url, payload) {
-    const response = await fetch(url, {
+    const response = await prefixedFetch(url, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(payload || {})
@@ -441,7 +445,7 @@
       );
       editor.close();
       if (window.confirm("Knowledge proposal created. Open Learning to review the diff?")) {
-        window.location.href = payload.learning_url;
+        window.location.href = packbridgeUrl(payload.learning_url);
       } else {
         window.location.reload();
       }

@@ -33,6 +33,28 @@ For coding work, an empty result, no write/edit action, unchanged branch HEAD, e
 
 ## Development ledger
 
+### OPS-UDA-001 — Reverse-proxy path compatibility
+Status: 🔨 IN PROGRESS
+Priority: High
+Branch: `feat/uda-subpath-compatibility`
+Requirement:
+- Support UDA's `/apps/<slug>/` proxy paths while retaining direct local root-mode use, existing PackBridge authentication, and functional document processing.
+Implementation:
+- Flask one-hop ProxyFix to generate prefix-aware routes.
+- Unique session cookie name, optional cookie path via `PACKBRIDGE_COOKIE_PATH` (deploy with `/apps/<slug>/` if public cookie isolation desired).
+- Base URL for client-side API resolution, scoped fetch requests, and application redirects.
+- Regression test covering prefixed and local routes.
+Evidence:
+- Code committed on migration branch; live UDA registry/public route unchanged.
+- CI and deployed Caddy testing pending.
+- No production UDA/public enablement performed.
+Completion criteria:
+- [ ] CI confirms tests pass and changes merge to main.
+- [ ] Browser upload, streaming, redirect, logout and API flows validated in UDA.
+- [ ] No direct backend exposure to untrusted forged headers.
+- [ ] User acceptance separately recorded.
+
+
 ### DEV-000 — Establish evidence-based development ledger
 Status: ✅ COMPLETE
 
